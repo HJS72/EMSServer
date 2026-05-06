@@ -45,16 +45,36 @@
       "power_state_key": "shelly.0.shellypmminig3#E4B063E0A038#1.PM1:0.Power",
       "has_battery": false,
       "source": "influx",
-      "power_source": "iobroker"
+      "power_source": "iobroker",
+      "pv_power_state_key": "",
+      "pv_power_source": "iobroker",
+      "battery_soc_state_key": "",
+      "battery_soc_source": "iobroker",
+      "battery_power_state_key": "",
+      "battery_power_source": "iobroker",
+      "battery_capacity_wh_state_key": "",
+      "battery_power_sign": "charge_positive",
+      "battery_rest_soc_percent": 0.0,
+      "battery_capacity_kwh": 0.0
     },
     {
       "id": "gen-2",
       "name": "PV mit Batterie",
       "state_key": "",
-      "power_state_key": "",
+      "power_state_key": "modbus.0.holdingRegisters.40084_I_AC_Leistung",
       "has_battery": true,
       "source": "influx",
-      "power_source": "iobroker"
+      "power_source": "iobroker",
+      "pv_power_state_key": "",
+      "pv_power_source": "iobroker",
+      "battery_soc_state_key": "modbus.0.holdingRegisters.102853_Batterieladung",
+      "battery_soc_source": "iobroker",
+      "battery_power_state_key": "modbus.0.holdingRegisters.102837_Batterieleistung",
+      "battery_power_source": "iobroker",
+      "battery_capacity_wh_state_key": "modbus.0.holdingRegisters.102787_Batt_Rated_Energy",
+      "battery_power_sign": "charge_positive",
+      "battery_rest_soc_percent": 15.0,
+      "battery_capacity_kwh": 0.0
     }
   ],
   "grid": {

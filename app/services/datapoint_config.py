@@ -33,7 +33,18 @@ class DataPointConfigService:
             ],
             generators=[
                 ConfigGenerator(id="gen-1", name="Hoymiles", state_key="EMS.Hoymiles.Energie", has_battery=False),
-                ConfigGenerator(id="gen-2", name="PV mit Batterie", state_key="", has_battery=True),
+                ConfigGenerator(
+                    id="gen-2",
+                    name="SolarEdge Hybrid",
+                    state_key="",
+                    has_battery=True,
+                    pv_power_state_key="",
+                    battery_soc_state_key="modbus.0.holdingRegisters.102853_Batterieladung",
+                    battery_power_state_key="",
+                    battery_capacity_wh_state_key="modbus.0.holdingRegisters.102787_Batt_Rated_Energy",
+                    battery_rest_soc_percent=10.0,
+                    battery_capacity_kwh=10.0,
+                ),
             ],
             grid=ConfigGrid(
                 id="grid-main",

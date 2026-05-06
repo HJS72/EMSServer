@@ -494,6 +494,16 @@
           source: g.source || "influx",
           power_state_key: g.power_state_key || "",
           power_source: g.power_source || "iobroker",
+          pv_power_state_key: g.pv_power_state_key || "",
+          pv_power_source: g.pv_power_source || "iobroker",
+          battery_soc_state_key: g.battery_soc_state_key || "",
+          battery_soc_source: g.battery_soc_source || "iobroker",
+          battery_power_state_key: g.battery_power_state_key || "",
+          battery_power_source: g.battery_power_source || "iobroker",
+          battery_capacity_wh_state_key: g.battery_capacity_wh_state_key || "",
+          battery_power_sign: g.battery_power_sign || "charge_positive",
+          battery_rest_soc_percent: g.battery_rest_soc_percent !== null && g.battery_rest_soc_percent !== undefined ? String(g.battery_rest_soc_percent) : "",
+          battery_capacity_kwh: g.battery_capacity_kwh !== null && g.battery_capacity_kwh !== undefined ? String(g.battery_capacity_kwh) : "",
           has_battery: !!g.has_battery,
           collapsed: false,
         };
@@ -597,7 +607,7 @@
           });
         }
         if (type === "pv" || type === "pv_battery") {
-          if (!(d.name || d.state_key || d.power_state_key)) return;
+          if (!(d.name || d.state_key || d.power_state_key || d.pv_power_state_key || d.battery_soc_state_key || d.battery_power_state_key || d.battery_capacity_wh_state_key || d.battery_rest_soc_percent)) return;
           generators.push({
             id: d.id,
             name: d.name || "PV-Anlage",
@@ -606,6 +616,16 @@
             source: d.source || "influx",
             power_state_key: d.power_state_key || "",
             power_source: d.power_source || "iobroker",
+            pv_power_state_key: d.pv_power_state_key || "",
+            pv_power_source: d.pv_power_source || "iobroker",
+            battery_soc_state_key: d.battery_soc_state_key || "",
+            battery_soc_source: d.battery_soc_source || "iobroker",
+            battery_power_state_key: d.battery_power_state_key || "",
+            battery_power_source: d.battery_power_source || "iobroker",
+            battery_capacity_wh_state_key: d.battery_capacity_wh_state_key || "",
+            battery_power_sign: d.battery_power_sign || "charge_positive",
+            battery_rest_soc_percent: Number(d.battery_rest_soc_percent || 0),
+            battery_capacity_kwh: Number(d.battery_capacity_kwh || 0),
           });
         }
       });
@@ -628,7 +648,7 @@
       };
     }
 
-    function field(label, key, value, placeholder = "", sourceOptions = false, fullWidth = false) {
+    function field(label, key, value, placeholder = "", sourceOptions = false, fullWidth = false, sourceKind = "default") {
       const wrap = document.createElement("div");
       wrap.className = "field" + (fullWidth ? " field-full" : "");
 
@@ -638,13 +658,28 @@
 
       if (sourceOptions) {
         const select = document.createElement("select");
-        ["influx", "iobroker"].forEach(v => {
+        const sourceItems = sourceKind === "energy"
+          ? [
+              ["influx", "InfluxDB"],
+              ["iobroker", "ioBroker"],
+              ["calculation", "Berechnung"],
+              ["calculation_db", "Berechnung und DB"],
+            ]
+          : [
+              ["influx", "InfluxDB"],
+              ["iobroker", "ioBroker"],
+            ];
+        sourceItems.forEach(([v, label]) => {
           const o = document.createElement("option");
           o.value = v;
-          o.textContent = v === "iobroker" ? "ioBroker" : "InfluxDB";
+          o.textContent = label;
           select.appendChild(o);
         });
-        select.value = value || "influx";
+        if (![...select.options].some(o => o.value === value)) {
+          select.value = "influx";
+        } else {
+          select.value = value || "influx";
+        }
         select.addEventListener("change", () => key.setter(select.value));
         wrap.appendChild(select);
       } else {
@@ -682,9 +717,9 @@
 
       if (inferType(device) === "grid") {
         grid.appendChild(field("Bezug Energie (kWh)", bind("import_state_key"), device.import_state_key, "EMS.Grid.Energie.in"));
-        grid.appendChild(field("Bezug Quelle", bindSrc("import_source"), device.import_source, "", true));
+        grid.appendChild(field("Bezug Quelle", bindSrc("import_source"), device.import_source, "", true, false, "energy"));
         grid.appendChild(field("Einspeisung Energie (kWh)", bind("export_state_key"), device.export_state_key, "EMS.Grid.Energie.out"));
-        grid.appendChild(field("Einspeisung Quelle", bindSrc("export_source"), device.export_source, "", true));
+        grid.appendChild(field("Einspeisung Quelle", bindSrc("export_source"), device.export_source, "", true, false, "energy"));
         grid.appendChild(field("Leistung (W)", bind("power_state_key"), device.power_state_key, "EMS.Grid.Leistung"));
         grid.appendChild(field("Leistung Quelle", bindSrc("power_source"), device.power_source, "", true));
         // power sign convention select
@@ -704,9 +739,40 @@
         } else {
         grid.appendChild(field("Name", bind("name"), device.name, "Gerätename", false, true));
         grid.appendChild(field("Energie (kWh)", bind("state_key"), device.state_key, "State-Key Energie"));
-        grid.appendChild(field("Energie Quelle", bindSrc("source"), device.source, "", true));
+        grid.appendChild(field("Energie Quelle", bindSrc("source"), device.source, "", true, false, "energy"));
         grid.appendChild(field("Leistung (W)", bind("power_state_key"), device.power_state_key, "State-Key Leistung"));
         grid.appendChild(field("Leistung Quelle", bindSrc("power_source"), device.power_source, "", true));
+
+        if (inferType(device) === "pv_battery") {
+          grid.appendChild(field("PV-Leistung (W)", bind("pv_power_state_key"), device.pv_power_state_key, "State-Key PV-Leistung"));
+          grid.appendChild(field("PV-Leistung Quelle", bindSrc("pv_power_source"), device.pv_power_source, "", true));
+          grid.appendChild(field("Batterie Leistung (W)", bind("battery_power_state_key"), device.battery_power_state_key, "State-Key Batterie Leistung"));
+          grid.appendChild(field("Batterie Leistung Quelle", bindSrc("battery_power_source"), device.battery_power_source, "", true));
+          grid.appendChild(field("Batterie SOC (%)", bind("battery_soc_state_key"), device.battery_soc_state_key, "State-Key Batterie SOC"));
+          grid.appendChild(field("Batterie SOC Quelle", bindSrc("battery_soc_source"), device.battery_soc_source, "", true));
+          grid.appendChild(field("Batterie Kapazitat (Wh)", bind("battery_capacity_wh_state_key"), device.battery_capacity_wh_state_key, "modbus.0.holdingRegisters.102787_Batt_Rated_Energy"));
+          grid.appendChild(field("Rest SOC (%)", bind("battery_rest_soc_percent"), device.battery_rest_soc_percent, "z.B. 10"));
+
+          const signWrap = document.createElement("div");
+          signWrap.className = "field field-full";
+          const signLabel = document.createElement("label");
+          signLabel.textContent = "Vorzeichen Batterie-Leistung";
+          const signSelect = document.createElement("select");
+          [["charge_positive", "Laden positiv (+W = Laden)"], ["discharge_positive", "Entladen positiv (+W = Entladen)"]].forEach(([v, t]) => {
+            const o = document.createElement("option");
+            o.value = v;
+            o.textContent = t;
+            signSelect.appendChild(o);
+          });
+          signSelect.value = device.battery_power_sign || "charge_positive";
+          signSelect.addEventListener("change", () => {
+            device.battery_power_sign = signSelect.value;
+            renderDevices();
+          });
+          signWrap.appendChild(signLabel);
+          signWrap.appendChild(signSelect);
+          grid.appendChild(signWrap);
+        }
 
         if (inferType(device) === "controllable_consumer") {
           grid.appendChild(field("Control-Key", bind("control_key"), device.control_key, "Schalt- oder Regel-State", false, true));
@@ -839,6 +905,16 @@
           source: "influx",
           power_state_key: "",
           power_source: "iobroker",
+          pv_power_state_key: "",
+          pv_power_source: "iobroker",
+          battery_soc_state_key: "",
+          battery_soc_source: "iobroker",
+          battery_power_state_key: "",
+          battery_power_source: "iobroker",
+          battery_capacity_wh_state_key: "modbus.0.holdingRegisters.102787_Batt_Rated_Energy",
+          battery_power_sign: "charge_positive",
+          battery_rest_soc_percent: "10",
+          battery_capacity_kwh: "10.0",
           has_battery: type === "pv_battery",
           collapsed: false,
         };

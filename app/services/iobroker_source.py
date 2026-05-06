@@ -20,7 +20,8 @@ class IoBrokerSource:
 
     async def get_current_value(self, state_id: str) -> float | None:
         base = self.settings.iobroker_url.rstrip("/")
-        url = f"{base}/getPlainValue/{state_id}"
+        encoded_state = quote(state_id, safe="")
+        url = f"{base}/getPlainValue/{encoded_state}"
 
         try:
             async with httpx.AsyncClient(timeout=10.0, auth=self._auth()) as client:

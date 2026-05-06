@@ -62,6 +62,22 @@ class ConfigGenerator(BaseModel):
     has_battery: bool = False
     source: str = "influx"  # "influx" oder "iobroker" für Energie
     power_source: str = "iobroker"  # Leistung kommt typischerweise von ioBroker
+    # Optional: separate PV power datapoint (if empty, power_state_key is used).
+    pv_power_state_key: str = ""
+    pv_power_source: str = "iobroker"
+    # Hybrid battery data points.
+    battery_soc_state_key: str = ""
+    battery_soc_source: str = "iobroker"
+    battery_power_state_key: str = ""
+    battery_power_source: str = "iobroker"
+    battery_capacity_wh_state_key: str = ""
+    # "charge_positive": +W means charging, -W means discharging.
+    # "discharge_positive": +W means discharging, -W means charging.
+    battery_power_sign: str = "charge_positive"
+    # Minimum SOC (%) to which discharging is allowed.
+    battery_rest_soc_percent: float = 0.0
+    # Installed battery capacity for ETA calculation.
+    battery_capacity_kwh: float = 0.0
 
 
 class ConfigGrid(BaseModel):

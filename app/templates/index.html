@@ -374,6 +374,13 @@
       font-size: 0.9rem;
       color: #d6e4f0;
       font-weight: 500;
+      margin: 0;
+    }
+
+    .live-item-head {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
       margin-bottom: 0.5rem;
     }
 
@@ -390,19 +397,44 @@
       flex: 1;
     }
 
+    .live-item-label.live-multi {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      line-height: 1.2;
+    }
+
+    .live-item-label .subrow {
+      display: block;
+    }
+
     .live-item-value {
       font-weight: 600;
       text-align: right;
     }
 
+    .live-item-value.live-multi {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.15rem;
+    }
+
+    .live-item-value .subrow {
+      display: block;
+      line-height: 1.2;
+    }
+
     .live-category.pv .live-item-value { color: #ffb703; }
     .live-category.consumer .live-item-value { color: #4cc9f0; }
-    .live-category.grid .live-item-value.import { color: #e76f51; }
-    .live-category.grid .live-item-value.export { color: #52b788; }
+    .live-item-value.import,
+    .live-item-value .subrow.import { color: #e76f51; }
+    .live-item-value.export,
+    .live-item-value .subrow.export { color: #52b788; }
 
     .live-item-icon {
-      font-size: 1.8rem;
-      margin-bottom: 0.4rem;
+      font-size: 1.5rem;
+      line-height: 1;
       opacity: 0.8;
     }
 
@@ -501,14 +533,23 @@
 
     const fmt = (n) => `${Number(n || 0).toFixed(2)} kWh`;
     const fmtPower = (n) => `${Number(n || 0).toFixed(1)} kW`;
+    const fmtHours = (n) => {
+      const h = Number(n);
+      if (!Number.isFinite(h) || h < 0) return "—";
+      if (h >= 24) return `${(h / 24).toFixed(1)} d`;
+      return `${h.toFixed(1)} h`;
+    };
     const sourceLabel = (s) => s === "iobroker" ? "ioBroker" : "InfluxDB";
 
     function sumByKey(items, key) {
       return (items || []).reduce((acc, row) => acc + Number(row[key] || 0), 0);
     }
 
-    async function fetchJson(url) {
-      const res = await fetch(url);
+    async function fetchJson(url, timeoutMs = 5000) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      const res = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(timer);
       if (!res.ok) throw new Error(`Fetch failed: ${url}`);
       return res.json();
     }
@@ -612,9 +653,24 @@
       });
     }
 
+    function renderLiveFallback() {
+      const container = document.getElementById("liveViewContainer");
+      if (!container) return;
+      container.innerHTML = `
+        <div class="live-item">
+          <div class="live-item-icon">⚠️</div>
+          <div class="live-item-name">Live-Ansicht</div>
+          <div class="live-item-row">
+            <div class="live-item-label">Status</div>
+            <div class="live-item-value">Datenquelle langsam/nicht erreichbar</div>
+          </div>
+        </div>
+      `;
+    }
+
     async function updateLiveView() {
       try {
-        const livedata = await fetchJson("/api/livedata/all");
+        const livedata = await fetchJson("/api/livedata/all", 5000);
         const container = document.getElementById("liveViewContainer");
         container.innerHTML = "";
 
@@ -629,6 +685,8 @@
         });
       } catch (err) {
         console.error("Error loading live view:", err);
+        renderLiveFallback();
+        showFooterStatus('Live-Daten derzeit nicht verfugbar', 'err');
       }
     }
 
@@ -640,7 +698,13 @@
       let line1 = "—";
       let line1Class = "";
       let line2 = "—";
+      let label2 = "";
+      let label2Class = "";
+      let line2Class = "";
       let line3 = "—";
+      let label3 = "";
+      let label3Class = "";
+      let line3Class = "";
       let lbl2 = "Tageswert";
       let lbl3 = "Prognose";
 
@@ -654,10 +718,36 @@
       } else if (device.type === "pv_battery") {
         icon = "🔋";
         line1 = device.power_w !== null && device.power_w !== undefined ? `${Number(device.power_w).toFixed(0)} W` : "—";
-        line2 = device.value_kwh !== null && device.value_kwh !== undefined ? fmt(device.value_kwh) : "—";
-        line3 = forecastTotals.pv ? fmt(forecastTotals.pv) : "—";
-        lbl2 = "Tagesertrag";
-        lbl3 = "Prognose Ertrag";
+        const pvYield = device.value_kwh !== null && device.value_kwh !== undefined ? fmt(device.value_kwh) : "—";
+        const pvForecast = forecastTotals.pv ? fmt(forecastTotals.pv) : "—";
+        const batterySoc = device.battery_soc !== null && device.battery_soc !== undefined ? `${Number(device.battery_soc).toFixed(1)} %` : "—";
+        const chargeW = device.battery_charge_w !== null && device.battery_charge_w !== undefined ? Number(device.battery_charge_w) : 0;
+        const dischargeW = device.battery_discharge_w !== null && device.battery_discharge_w !== undefined ? Number(device.battery_discharge_w) : 0;
+        let batteryPowerTxt = "—";
+        let batteryPowerClass = "";
+        if (chargeW > 0) {
+          batteryPowerTxt = `${chargeW.toFixed(0)} W Laden`;
+          batteryPowerClass = "export";
+        } else if (dischargeW > 0) {
+          batteryPowerTxt = `${dischargeW.toFixed(0)} W Entladen`;
+          batteryPowerClass = "import";
+        }
+        const etaMode = device.battery_eta_mode === "full" ? "bis voll" : (device.battery_eta_mode === "empty" ? "bis leer" : "");
+        const etaTxt = device.battery_eta_hours !== null && device.battery_eta_hours !== undefined
+          ? `${fmtHours(device.battery_eta_hours)}${etaMode ? ` ${etaMode}` : ""}`
+          : "—";
+
+        label2 = `<span class="subrow">Tagesertrag</span><span class="subrow">Prognose Ertrag</span>`;
+        label2Class = "live-multi";
+        line2 = `<span class="subrow">${pvYield}</span><span class="subrow">${pvForecast}</span>`;
+        line2Class = "live-multi";
+
+        label3 = `<span class="subrow">Batterie SOC</span><span class="subrow">Batterie Leistung</span><span class="subrow">Dauer</span>`;
+        label3Class = "live-multi";
+        line3 = `<span class="subrow">${batterySoc}</span><span class="subrow ${batteryPowerClass}">${batteryPowerTxt}</span><span class="subrow">${etaTxt}</span>`;
+        line3Class = "live-multi";
+        lbl2 = "";
+        lbl3 = "";
       } else if (device.type === "consumer" || device.type === "controllable_consumer") {
         icon = device.type === "controllable_consumer" ? "🧠" : "🔌";
         line1 = device.power_w !== null && device.power_w !== undefined ? `${Number(device.power_w).toFixed(0)} W` : "—";
@@ -675,35 +765,48 @@
         if (imp === null && exp === null) {
           line1 = "—";
         } else if ((exp ?? 0) > 0) {
-          line1 = `Einspeisung ${Number(exp).toFixed(0)} W`;
+          line1 = `${Number(exp).toFixed(0)} W`;
           line1Class = "export";
         } else {
-          line1 = `Bezug ${Number(imp ?? 0).toFixed(0)} W`;
+          line1 = `${Number(imp ?? 0).toFixed(0)} W`;
           line1Class = "import";
         }
 
         const impE = device.import_value_kwh !== null && device.import_value_kwh !== undefined ? fmt(device.import_value_kwh) : "—";
         const expE = device.export_value_kwh !== null && device.export_value_kwh !== undefined ? fmt(device.export_value_kwh) : "—";
-        line2 = `Bezug ${impE} | Einspeisung ${expE}`;
-        line3 = `PV ${forecastTotals.pv ? fmt(forecastTotals.pv) : "—"} | Last ${forecastTotals.consumption ? fmt(forecastTotals.consumption) : "—"}`;
-        lbl2 = "Energie heute";
-        lbl3 = "Prognose";
+        const forecastImport = forecastTotals.consumption ? fmt(forecastTotals.consumption) : "—";
+        const forecastExport = forecastTotals.pv ? fmt(forecastTotals.pv) : "—";
+        label2 = `<span class="subrow">Bezug</span><span class="subrow">Einspeisung</span>`;
+        label2Class = "live-multi";
+        line2 = `<span class="subrow import">${impE}</span><span class="subrow export">${expE}</span>`;
+        line2Class = "live-multi";
+        label3 = `<span class="subrow">Prognose Bezug</span><span class="subrow">Prognose Einspeisung</span>`;
+        label3Class = "live-multi";
+        line3 = `<span class="subrow import">${forecastImport}</span><span class="subrow export">${forecastExport}</span>`;
+        line3Class = "live-multi";
+        lbl2 = "";
+        lbl3 = "";
       }
 
+      if (!label2) label2 = lbl2;
+      if (!label3) label3 = lbl3;
+
       itemEl.innerHTML = `
-        <div class="live-item-icon">${icon}</div>
-        <div class="live-item-name">${device.name || "Gerat"}</div>
+        <div class="live-item-head">
+          <div class="live-item-icon">${icon}</div>
+          <div class="live-item-name">${device.name || "Gerat"}</div>
+        </div>
         <div class="live-item-row">
           <div class="live-item-label">Leistung aktuell</div>
           <div class="live-item-value ${line1Class}">${line1}</div>
         </div>
         <div class="live-item-row">
-          <div class="live-item-label">${lbl2}</div>
-          <div class="live-item-value">${line2}</div>
+          <div class="live-item-label ${label2Class}">${label2}</div>
+          <div class="live-item-value ${line2Class}">${line2}</div>
         </div>
         <div class="live-item-row">
-          <div class="live-item-label">${lbl3}</div>
-          <div class="live-item-value">${line3}</div>
+          <div class="live-item-label ${label3Class}">${label3}</div>
+          <div class="live-item-value ${line3Class}">${line3}</div>
         </div>
       `;
 
@@ -741,27 +844,34 @@
     }
 
     async function init() {
+      const results = await Promise.allSettled([
+        fetchJson("/api/forecast/today", 7000),
+        fetchJson("/api/actuals/today", 7000),
+        fetchJson("/api/compare/today", 7000),
+        fetchJson("/api/history?days=14", 7000),
+      ]);
+
+      if (results[0].status === "fulfilled") state.forecast = results[0].value;
+      if (results[1].status === "fulfilled") state.actuals = results[1].value;
+      if (results[2].status === "fulfilled") state.compare = results[2].value;
+      if (results[3].status === "fulfilled") state.history = results[3].value;
+
+      try { updateKpis(); } catch (_) {}
       try {
-        const [forecast, actuals, compare, history] = await Promise.all([
-          fetchJson("/api/forecast/today"),
-          fetchJson("/api/actuals/today"),
-          fetchJson("/api/compare/today"),
-          fetchJson("/api/history?days=14"),
-        ]);
+        if (state.forecast?.points?.length) createForecastChart();
+      } catch (_) {}
+      try {
+        if (state.compare?.points?.length) createCompareChart();
+      } catch (_) {}
+      try {
+        if (state.history?.actual?.length || state.history?.forecast?.length) createHistoryChart();
+      } catch (_) {}
 
-        state.forecast = forecast;
-        state.actuals = actuals;
-        state.compare = compare;
-        state.history = history;
-
-        updateKpis();
-        createForecastChart();
-        createCompareChart();
-        createHistoryChart();
+      const failed = results.filter(r => r.status === "rejected").length;
+      if (failed === 0) {
         showFooterStatus('Daten aktualisiert', 'ok');
-      } catch (err) {
-        console.error(err);
-        showFooterStatus('Fehler beim Laden der Daten', 'err');
+      } else {
+        showFooterStatus(`Teilweise geladen (${failed} Quelle(n) langsam)`, 'info');
       }
     }
 
