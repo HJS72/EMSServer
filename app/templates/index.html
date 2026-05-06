@@ -236,6 +236,25 @@
     </section>
 
     <section class="panel">
+      <h2>Konfigurierte Elemente (Live)</h2>
+      <div id="elementsContainer" style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; color: var(--text);">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--line);">
+              <th style="text-align: left; padding: 0.6rem; color: var(--muted);">Element</th>
+              <th style="text-align: left; padding: 0.6rem; color: var(--muted);">Typ</th>
+              <th style="text-align: right; padding: 0.6rem; color: var(--muted);">Leistung aktuell</th>
+              <th style="text-align: right; padding: 0.6rem; color: var(--muted);">Tagesverbrauch</th>
+              <th style="text-align: left; padding: 0.6rem; color: var(--muted);">Quelle</th>
+            </tr>
+          </thead>
+          <tbody id="elementsTable"></tbody>
+        </table>
+      </div>
+      <div class="hint">Live-Daten von konfigurierten Verbrauchern, Generatoren und Stromnetz</div>
+    </section>
+
+    <section class="panel">
       <h2>Soll/Ist (stündlich)</h2>
       <div class="chart-box">
         <canvas id="compareChart"></canvas>
@@ -268,6 +287,8 @@
     };
 
     const fmt = (n) => `${Number(n || 0).toFixed(2)} kWh`;
+    const fmtPower = (n) => `${Number(n || 0).toFixed(1)} kW`;
+    const sourceLabel = (s) => s === "iobroker" ? "ioBroker" : "InfluxDB";
 
     function sumByKey(items, key) {
       return (items || []).reduce((acc, row) => acc + Number(row[key] || 0), 0);
@@ -378,6 +399,117 @@
       });
     }
 
+    async function updateElementsTable() {
+      try {
+        const livedata = await fetchJson("/api/livedata/all");
+        const tbody = document.getElementById("elementsTable");
+        tbody.innerHTML = "";
+
+        const rows = [];
+
+        // Verbraucher
+        (livedata.consumers || []).forEach(c => {
+          rows.push({
+            name: c.name,
+            type: "Verbraucher",
+            power: c.value_kwh,
+            consumption: c.value_kwh,
+            source: c.source
+          });
+        });
+
+        // Steuerbare Verbraucher
+        (livedata.controllable_consumers || []).forEach(c => {
+          rows.push({
+            name: c.name,
+            type: "Heizung/Klima",
+            power: c.value_kwh,
+            consumption: c.value_kwh,
+            source: c.source
+          });
+        });
+
+        // Generatoren
+        (livedata.generators || []).forEach(g => {
+          rows.push({
+            name: g.name,
+            type: g.has_battery ? "PV + Speicher" : "PV",
+            power: g.value_kwh,
+            consumption: g.value_kwh,
+            source: g.source
+          });
+        });
+
+        // Stromnetz
+        if (livedata.grid) {
+          rows.push({
+            name: "Netz (Import)",
+            type: "Stromnetz",
+            power: livedata.grid.import_value,
+            consumption: livedata.grid.import_value,
+            source: "grid"
+          });
+          rows.push({
+            name: "Netz (Export)",
+            type: "Stromnetz",
+            power: livedata.grid.export_value,
+            consumption: livedata.grid.export_value,
+            source: "grid"
+          });
+        }
+
+        rows.forEach(row => {
+          const tr = document.createElement("tr");
+          tr.style.borderBottom = "1px solid var(--line)";
+          
+          const powerVal = row.power ? fmtPower(row.power) : "—";
+          const consumptionVal = row.consumption ? fmt(row.consumption) : "—";
+          const sourceLabel_val = row.source === "grid" ? "Netz" : sourceLabel(row.source);
+
+          tr.innerHTML = `
+            <td style="padding: 0.6rem; color: #e8f0f7;">${row.name}</td>
+            <td style="padding: 0.6rem; color: var(--muted);">${row.type}</td>
+            <td style="padding: 0.6rem; text-align: right; color: #ffb703; font-weight: 600;">${powerVal}</td>
+            <td style="padding: 0.6rem; text-align: right; color: #4cc9f0;">${consumptionVal}</td>
+            <td style="padding: 0.6rem; color: var(--muted); font-size: 0.85rem;">${sourceLabel_val}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error("Error loading elements:", err);
+      }
+    }
+
+    function createHistoryChart() {
+      const histA = state.history?.actual || [];
+      const histF = state.history?.forecast || [];
+      const labels = histA.map(d => d.day.slice(5));
+
+      new Chart(document.getElementById("historyChart"), {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            { label: "Verbrauch Ist", data: histA.map(d => d.consumption_kwh), borderColor: "#4cc9f0", tension: 0.25 },
+            { label: "PV Ist", data: histA.map(d => d.pv_kwh), borderColor: "#ffb703", tension: 0.25 },
+            { label: "Verbrauch Soll", data: histF.map(d => d.consumption_kwh), borderColor: "#90e0ef", borderDash: [5, 4], tension: 0.25 },
+            { label: "PV Soll", data: histF.map(d => d.pv_kwh), borderColor: "#52b788", borderDash: [5, 4], tension: 0.25 },
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: "#dce8f2" } }
+          },
+          scales: {
+            x: { ticks: { color: "#9bb0c3" }, grid: { color: "#1f3347" } },
+            y: { ticks: { color: "#9bb0c3" }, grid: { color: "#1f3347" } }
+          }
+        }
+      });
+    }
+
     async function init() {
       try {
         const [forecast, actuals, compare, history] = await Promise.all([
@@ -400,6 +532,10 @@
         console.error(err);
       }
     }
+
+    // Update elements table more frequently (every 30 seconds)
+    updateElementsTable();
+    setInterval(updateElementsTable, 30 * 1000);
 
     init();
     setInterval(init, 15 * 60 * 1000);
