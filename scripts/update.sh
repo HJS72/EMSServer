@@ -29,6 +29,14 @@ if [[ ! -d .git ]]; then
   exit 1
 fi
 
+# Ensure remote origin is set (first-time setup on server)
+REPO_URL="${GITHUB_REPO_URL:-https://github.com/HJS72/EMSServer.git}"
+if ! git remote get-url origin &>/dev/null; then
+  git remote add origin "$REPO_URL"
+elif [[ "$(git remote get-url origin)" != "$REPO_URL" ]]; then
+  git remote set-url origin "$REPO_URL"
+fi
+
 run_as_app "git fetch origin '$BRANCH'"
 LOCAL_SHA="$(run_as_app "git rev-parse HEAD")"
 REMOTE_SHA="$(run_as_app "git rev-parse 'origin/$BRANCH'")"
