@@ -439,8 +439,8 @@
     };
 
     const typeMeta = {
-      pv: {label: "PV-Anlage", icon: "PV"},
-      pv_battery: {label: "PV-Anlage mit Batterie", icon: "BAT"},
+      pv: {label: "PV-Anlage", icon: ""},
+      pv_battery: {label: "PV-Anlage mit Batterie", icon: ""},
       consumer: {label: "Verbraucher", icon: "LOAD"},
       controllable_consumer: {label: "Steuerbarer Verbraucher", icon: "CTRL"},
       grid: {label: "Netz", icon: "GRID"},
@@ -754,7 +754,8 @@
 
         const type = document.createElement("div");
         type.className = "device-type";
-        type.textContent = `${typeMeta[inferType(device)].icon} ${typeMeta[inferType(device)].label}`;
+        const meta = typeMeta[inferType(device)];
+        type.textContent = meta.icon ? `${meta.icon} ${meta.label}` : meta.label;
 
         titleWrap.appendChild(title);
         titleWrap.appendChild(type);
