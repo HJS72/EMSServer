@@ -36,6 +36,10 @@ class IoBrokerSource:
         except Exception:
             return None
 
+    async def get_state_value(self, state_id: str) -> float | None:
+        """Alias for get_current_value for compatibility."""
+        return await self.get_current_value(state_id)
+
     def get_history(
         self,
         state_id: str,

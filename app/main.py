@@ -130,7 +130,7 @@ async def livedata_all() -> JSONResponse:
             return None
         try:
             if source == "iobroker":
-                return await iobroker.get_state_value(state_key)
+                return await iobroker.get_current_value(state_key)
             else:
                 return await influx.get_latest_value(state_key)
         except Exception:

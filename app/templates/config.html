@@ -685,8 +685,8 @@
         grid.appendChild(field("Bezug Quelle", bindSrc("import_source"), device.import_source, "", true));
         grid.appendChild(field("Einspeisung Energie (kWh)", bind("export_state_key"), device.export_state_key, "EMS.Grid.Energie.out"));
         grid.appendChild(field("Einspeisung Quelle", bindSrc("export_source"), device.export_source, "", true));
-          grid.appendChild(field("Leistung (W)", bind("power_state_key"), device.power_state_key, "EMS.Grid.Leistung", false, true));
-          grid.appendChild(field("Leistung Quelle", bindSrc("power_source"), device.power_source, "", true));
+        grid.appendChild(field("Leistung (W)", bind("power_state_key"), device.power_state_key, "EMS.Grid.Leistung"));
+        grid.appendChild(field("Leistung Quelle", bindSrc("power_source"), device.power_source, "", true));
         // power sign convention select
         const signWrap = document.createElement("div");
         signWrap.className = "field field-full";

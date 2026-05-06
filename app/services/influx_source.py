@@ -94,3 +94,15 @@ from(bucket: "{bucket_esc}")
         now = datetime.now(timezone.utc)
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         return self.hourly_series(state_key=state_key, start=start, stop=now, custom_query=custom_query)
+
+    async def get_latest_value(self, state_key: str, custom_query: str = "") -> float | None:
+        """Get the latest value from today's data."""
+        if not state_key:
+            return None
+        try:
+            points = self.hourly_today(state_key, custom_query)
+            if points:
+                return points[-1].value
+            return None
+        except Exception:
+            return None

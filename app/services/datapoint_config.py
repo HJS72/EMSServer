@@ -23,14 +23,23 @@ class DataPointConfigService:
                 ConfigConsumer(id="consumer-2", name="Trockner", state_key=""),
             ],
             controllable_consumers=[
-                ConfigControllableConsumer(id="ctrl-1", name="Ochsner", state_key="", control_key=""),
+                ConfigControllableConsumer(
+                    id="ctrl-1", 
+                    name="Ochsner", 
+                    state_key="EMS.Ochsner.Energie",
+                    control_key="shelly.0.SHPLG-S#FDD4A3#1.Relay0.Power"
+                ),
                 ConfigControllableConsumer(id="ctrl-2", name="Klima", state_key="", control_key=""),
             ],
             generators=[
-                ConfigGenerator(id="gen-1", name="PV", state_key="", has_battery=False),
+                ConfigGenerator(id="gen-1", name="Hoymiles", state_key="EMS.Hoymiles.Energie", has_battery=False),
                 ConfigGenerator(id="gen-2", name="PV mit Batterie", state_key="", has_battery=True),
             ],
-            grid=ConfigGrid(id="grid-main"),
+            grid=ConfigGrid(
+                id="grid-main",
+                import_state_key="EMS.Grid.Energie.in",
+                export_state_key="EMS.Grid.Energie.out"
+            ),
             device_order=["gen-1", "gen-2", "consumer-1", "consumer-2", "ctrl-1", "ctrl-2", "grid-main"],
         )
 
