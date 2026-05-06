@@ -1,0 +1,12 @@
+[Unit]
+Description=EMS OTA Updater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=__WORKDIR__
+EnvironmentFile=__WORKDIR__/.env
+Environment=APP_USER=__APP_USER__
+ExecStart=__WORKDIR__/scripts/update.sh

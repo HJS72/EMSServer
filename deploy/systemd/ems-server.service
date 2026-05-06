@@ -1,0 +1,16 @@
+[Unit]
+Description=EMS Forecast Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__WORKDIR__
+EnvironmentFile=__WORKDIR__/.env
+ExecStart=__WORKDIR__/scripts/start.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

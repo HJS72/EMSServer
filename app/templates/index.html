@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EMS Forecast</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #07111a;
+      --card: #0d1b2a;
+      --card-strong: #13263b;
+      --text: #e8f0f7;
+      --muted: #9bb0c3;
+      --primary: #4cc9f0;
+      --accent: #ffb703;
+      --ok: #52b788;
+      --warn: #e76f51;
+      --line: #1f3347;
+      --glow: #4cc9f01f;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 12%, #12304a 0, transparent 32%),
+        radial-gradient(circle at 88% 18%, #2a1e3f 0, transparent 30%),
+        radial-gradient(circle at 82% 82%, #0f3b46 0, transparent 28%),
+        var(--bg);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(1180px, calc(100% - 2rem));
+      margin: 1.2rem auto 2rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .menu {
+      display: flex;
+      gap: 0.65rem;
+      align-items: center;
+      background: #0b1825cc;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.35rem;
+      width: fit-content;
+      backdrop-filter: blur(6px);
+    }
+
+    .menu a {
+      color: var(--muted);
+      text-decoration: none;
+      padding: 0.38rem 0.8rem;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      border: 1px solid transparent;
+      transition: 180ms ease;
+    }
+
+    .menu a.active {
+      color: #eaf5ff;
+      background: #1a3149;
+      border-color: #2a4a67;
+    }
+
+    .menu a:hover {
+      color: #eaf5ff;
+      border-color: #2a4a67;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #10273b 0%, #183a57 52%, #1f5f7a 100%);
+      color: #edf6fb;
+      border-radius: 18px;
+      padding: 1.2rem;
+      border: 1px solid #2a4a67;
+      box-shadow: 0 18px 44px #02060c66;
+      animation: rise 450ms ease-out;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      font-size: clamp(1.3rem, 2.2vw, 2rem);
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .version-badge {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: #7aafcc;
+      background: #0b1e2e;
+      border: 1px solid #2a4a67;
+      border-radius: 999px;
+      padding: 0.15rem 0.5rem;
+      letter-spacing: 0.4px;
+      white-space: nowrap;
+    }
+
+    .update-btn {
+      display: none;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #fff;
+      background: #e76f51;
+      border: none;
+      border-radius: 999px;
+      padding: 0.2rem 0.65rem;
+      cursor: pointer;
+      animation: pulse-warn 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulse-warn {
+      0%, 100% { box-shadow: 0 0 0 0 #e76f5166; }
+      50%       { box-shadow: 0 0 0 6px #e76f5100; }
+    }
+
+    .hero p {
+      margin: 0.4rem 0 0;
+      color: #bfd4e4;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.8rem;
+    }
+
+    .kpi {
+      background: linear-gradient(180deg, var(--card) 0%, var(--card-strong) 100%);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 0.8rem;
+      box-shadow: inset 0 1px 0 #ffffff08, 0 12px 32px #02060c33;
+      animation: rise 550ms ease-out;
+    }
+
+    .kpi .label {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .kpi .value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-top: 0.15rem;
+      color: #f8fbff;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, var(--card) 0%, var(--card-strong) 100%);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 0.9rem;
+      box-shadow: inset 0 1px 0 #ffffff08, 0 14px 36px #02060c40;
+      animation: rise 650ms ease-out;
+    }
+
+    .panel h2 {
+      margin: 0 0 0.65rem;
+      font-size: 1rem;
+      letter-spacing: 0.25px;
+      text-transform: uppercase;
+      color: #d6e4f0;
+    }
+
+    .chart-box {
+      position: relative;
+      height: min(40vh, 500px);
+      max-height: 500px;
+    }
+
+    canvas {
+      background: linear-gradient(180deg, #0a1520 0%, #0d1b2a 100%);
+      border-radius: 10px;
+      box-shadow: inset 0 0 0 1px #ffffff08;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+
+    @media (min-width: 980px) {
+      .grid-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @keyframes rise {
+      from {
+        transform: translateY(14px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <nav class="menu" aria-label="Hauptmenu">
+      <a class="active" href="/">Dashboard</a>
+      <a href="/config">Konfiguration</a>
+    </nav>
+
+    <section class="hero">
+      <h1>Stromverbrauch- und PV-Vorhersage
+        <span class="version-badge" id="versionBadge">v{{ version }}</span>
+        <button class="update-btn" id="updateBtn" onclick="applyUpdate()">Update verfügbar ↑</button>
+      </h1>
+      <p>Stündliche Tagesprognose mit Soll/Ist-Vergleich und Historie</p>
+    </section>
+
+    <section class="kpis">
+      <article class="kpi"><div class="label">Prognose Verbrauch heute</div><div class="value" id="kpiForecastConsumption">-</div></article>
+      <article class="kpi"><div class="label">Prognose PV heute</div><div class="value" id="kpiForecastPv">-</div></article>
+      <article class="kpi"><div class="label">Ist Verbrauch heute</div><div class="value" id="kpiActualConsumption">-</div></article>
+      <article class="kpi"><div class="label">Ist PV heute</div><div class="value" id="kpiActualPv">-</div></article>
+    </section>
+
+    <section class="panel">
+      <h2>Soll/Ist (stündlich)</h2>
+      <div class="chart-box">
+        <canvas id="compareChart"></canvas>
+      </div>
+      <div class="hint">Linie: Prognose, Punkte: Ist-Werte je Stunde</div>
+    </section>
+
+    <section class="grid-2">
+      <article class="panel">
+        <h2>Tagesprognose (24h)</h2>
+        <div class="chart-box">
+          <canvas id="forecastChart"></canvas>
+        </div>
+      </article>
+      <article class="panel">
+        <h2>Historische Tageswerte</h2>
+        <div class="chart-box">
+          <canvas id="historyChart"></canvas>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      forecast: null,
+      actuals: null,
+      compare: null,
+      history: null,
+    };
+
+    const fmt = (n) => `${Number(n || 0).toFixed(2)} kWh`;
+
+    function sumByKey(items, key) {
+      return (items || []).reduce((acc, row) => acc + Number(row[key] || 0), 0);
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Fetch failed: ${url}`);
+      return res.json();
+    }
+
+    function updateKpis() {
+      const f = state.forecast?.points || [];
+      const a = state.actuals?.points || [];
+      document.getElementById("kpiForecastConsumption").textContent = fmt(sumByKey(f, "consumption_kwh"));
+      document.getElementById("kpiForecastPv").textContent = fmt(sumByKey(f, "pv_kwh"));
+      document.getElementById("kpiActualConsumption").textContent = fmt(sumByKey(a, "consumption_kwh"));
+      document.getElementById("kpiActualPv").textContent = fmt(sumByKey(a, "pv_kwh"));
+    }
+
+    function createForecastChart() {
+      const labels = (state.forecast?.points || []).map(p => new Date(p.time).getHours().toString().padStart(2, "0"));
+      const consumption = (state.forecast?.points || []).map(p => p.consumption_kwh);
+      const pv = (state.forecast?.points || []).map(p => p.pv_kwh);
+
+      new Chart(document.getElementById("forecastChart"), {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: "Verbrauch Prognose", data: consumption, backgroundColor: "#4cc9f0aa", borderColor: "#4cc9f0" },
+            { label: "PV Prognose", data: pv, backgroundColor: "#ffb703aa", borderColor: "#ffb703" }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: "#dce8f2" } }
+          },
+          scales: {
+            x: { ticks: { color: "#9bb0c3" }, grid: { color: "#1f3347" } },
+            y: { ticks: { color: "#9bb0c3" }, grid: { color: "#1f3347" } }
+          }
+        }
+      });
+    }
+
+    function createCompareChart() {
+      const labels = (state.compare?.points || []).map(p => new Date(p.time).getHours().toString().padStart(2, "0"));
+      const fCon = (state.compare?.points || []).map(p => p.forecast_consumption_kwh);
+      const aCon = (state.compare?.points || []).map(p => p.actual_consumption_kwh);
+      const fPv = (state.compare?.points || []).map(p => p.forecast_pv_kwh);
+      const aPv = (state.compare?.points || []).map(p => p.actual_pv_kwh);
+
+      new Chart(document.getElementById("compareChart"), {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            { label: "Verbrauch Soll", data: fCon, borderColor: "#4cc9f0", backgroundColor: "#4cc9f033", fill: false, tension: 0.2 },
+            { label: "Verbrauch Ist", data: aCon, borderColor: "#e8f0f7", backgroundColor: "#e8f0f7", pointRadius: 3, showLine: false },
+            { label: "PV Soll", data: fPv, borderColor: "#ffb703", backgroundColor: "#ffb70333", fill: false, tension: 0.2 },
+            { label: "PV Ist", data: aPv, borderColor: "#52b788", backgroundColor: "#52b788", pointRadius: 3, showLine: false },
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: "#dce8f2" } }
+          },
+          scales: {
+            x: { ticks: { color: "#9bb0c3" }, grid: { color: "#1f3347" } },
+            y: { ticks: { color: "#9bb0c3" }, grid: { color: "#1f3347" } }
+          }
+        }
+      });
+    }
+
+    function createHistoryChart() {
+      const histA = state.history?.actual || [];
+      const histF = state.history?.forecast || [];
+      const labels = histA.map(d => d.day.slice(5));
+
+      new Chart(document.getElementById("historyChart"), {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            { label: "Verbrauch Ist", data: histA.map(d => d.consumption_kwh), borderColor: "#4cc9f0", tension: 0.25 },
+            { label: "PV Ist", data: histA.map(d => d.pv_kwh), borderColor: "#ffb703", tension: 0.25 },
+            { label: "Verbrauch Soll", data: histF.map(d => d.consumption_kwh), borderColor: "#90e0ef", borderDash: [5, 4], tension: 0.25 },
+            { label: "PV Soll", data: histF.map(d => d.pv_kwh), borderColor: "#52b788", borderDash: [5, 4], tension: 0.25 },
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: "#dce8f2" } }
+          },
+          scales: {
+            x: { ticks: { color: "#9bb0c3" }, grid: { color: "#1f3347" } },
+            y: { ticks: { color: "#9bb0c3" }, grid: { color: "#1f3347" } }
+          }
+        }
+      });
+    }
+
+    async function init() {
+      try {
+        const [forecast, actuals, compare, history] = await Promise.all([
+          fetchJson("/api/forecast/today"),
+          fetchJson("/api/actuals/today"),
+          fetchJson("/api/compare/today"),
+          fetchJson("/api/history?days=14"),
+        ]);
+
+        state.forecast = forecast;
+        state.actuals = actuals;
+        state.compare = compare;
+        state.history = history;
+
+        updateKpis();
+        createForecastChart();
+        createCompareChart();
+        createHistoryChart();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    init();
+    setInterval(init, 15 * 60 * 1000);
+
+    // ── update check ──────────────────────────────────────────────
+    async function checkUpdate() {
+      try {
+        const r = await fetch('/api/update/check');
+        const d = await r.json();
+        if (d.update_available) {
+          const btn = document.getElementById('updateBtn');
+          if (btn) {
+            btn.textContent = `Update → v${d.latest} ↑`;
+            btn.style.display = 'inline-block';
+          }
+        }
+      } catch (_) {}
+    }
+
+    async function applyUpdate() {
+      const btn = document.getElementById('updateBtn');
+      if (btn) { btn.textContent = 'Aktualisiere…'; btn.disabled = true; }
+      try {
+        const r = await fetch('/api/update/apply', { method: 'POST' });
+        const d = await r.json();
+        if (d.status === 'ok') {
+          alert('Update erfolgreich. Server wird neu gestartet…');
+        } else {
+          alert('Fehler beim Update:\n' + (d.output || d.error));
+          if (btn) { btn.disabled = false; }
+        }
+      } catch (e) {
+        alert('Update fehlgeschlagen: ' + e);
+        if (btn) { btn.disabled = false; }
+      }
+    }
+
+    checkUpdate();
+    setInterval(checkUpdate, 60 * 60 * 1000);
+  </script>
+</body>
+</html>

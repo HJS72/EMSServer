@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EMS Konfiguration</title>
+  <style>
+    :root {
+      --bg: #07111a;
+      --card: #0d1b2a;
+      --card-strong: #13263b;
+      --text: #e8f0f7;
+      --muted: #9bb0c3;
+      --line: #1f3347;
+      --good: #52b788;
+      --warn: #e76f51;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 12%, #12304a 0, transparent 32%),
+        radial-gradient(circle at 88% 18%, #2a1e3f 0, transparent 30%),
+        radial-gradient(circle at 82% 82%, #0f3b46 0, transparent 28%),
+        var(--bg);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(1220px, calc(100% - 2rem));
+      margin: 1.2rem auto 2rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .menu {
+      display: flex;
+      gap: 0.65rem;
+      align-items: center;
+      background: #0b1825cc;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.35rem;
+      width: fit-content;
+      backdrop-filter: blur(6px);
+    }
+
+    .menu a {
+      color: var(--muted);
+      text-decoration: none;
+      padding: 0.38rem 0.8rem;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      border: 1px solid transparent;
+      transition: 180ms ease;
+    }
+
+    .menu a.active {
+      color: #eaf5ff;
+      background: #1a3149;
+      border-color: #2a4a67;
+    }
+
+    .menu a:hover {
+      color: #eaf5ff;
+      border-color: #2a4a67;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #10273b 0%, #183a57 52%, #1f5f7a 100%);
+      border-radius: 18px;
+      padding: 1rem 1.2rem;
+      border: 1px solid #2a4a67;
+      box-shadow: 0 18px 44px #02060c66;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(1.2rem, 2vw, 1.8rem);
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .version-badge {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: #7aafcc;
+      background: #0b1e2e;
+      border: 1px solid #2a4a67;
+      border-radius: 999px;
+      padding: 0.15rem 0.5rem;
+      letter-spacing: 0.4px;
+      white-space: nowrap;
+    }
+
+    .update-btn {
+      display: none;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #fff;
+      background: #e76f51;
+      border: none;
+      border-radius: 999px;
+      padding: 0.2rem 0.65rem;
+      cursor: pointer;
+      animation: pulse-warn 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulse-warn {
+      0%, 100% { box-shadow: 0 0 0 0 #e76f5166; }
+      50%       { box-shadow: 0 0 0 6px #e76f5100; }
+    }
+
+    .hero p {
+      margin: 0.45rem 0 0;
+      color: #bfd4e4;
+    }
+
+    .grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background: linear-gradient(180deg, var(--card) 0%, var(--card-strong) 100%);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 0.9rem;
+      box-shadow: inset 0 1px 0 #ffffff08, 0 14px 36px #02060c40;
+    }
+
+    .card h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.25px;
+      color: #d6e4f0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 0.45rem;
+      border-bottom: 1px solid #21364a;
+      vertical-align: middle;
+    }
+
+    th {
+      color: #b9cad9;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid #2b465f;
+      background: #0a1622;
+      color: #ebf4fb;
+      border-radius: 8px;
+      padding: 0.45rem 0.55rem;
+      font-size: 0.9rem;
+    }
+
+    input[type="checkbox"] {
+      transform: scale(1.1);
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 0.45rem;
+      justify-content: flex-end;
+      margin-top: 0.65rem;
+    }
+
+    button {
+      border: 1px solid #2f4e6b;
+      color: #e8f0f7;
+      background: #17324a;
+      border-radius: 10px;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d3c59;
+    }
+
+    button.secondary {
+      background: #0d1d2c;
+    }
+
+    .remove-btn {
+      border-color: #6b2e2e;
+      background: #3a1d1d;
+    }
+
+    .status {
+      font-size: 0.9rem;
+      color: var(--muted);
+      min-height: 1.4em;
+    }
+
+    .status.ok {
+      color: var(--good);
+    }
+
+    .status.err {
+      color: var(--warn);
+    }
+
+    @media (min-width: 980px) {
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .card.full {
+        grid-column: 1 / -1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <nav class="menu" aria-label="Hauptmenu">
+      <a href="/">Dashboard</a>
+      <a class="active" href="/config">Konfiguration</a>
+    </nav>
+
+    <section class="hero">
+      <h1>Datenpunkt-Konfiguration
+        <span class="version-badge" id="versionBadge">v{{ version }}</span>
+        <button class="update-btn" id="updateBtn" onclick="applyUpdate()">Update verfügbar ↑</button>
+      </h1>
+      <p>Verwalte Verbraucher, steuerbare Verbraucher, Erzeuger und Grid-Datenpunkte zentral.</p>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Reine Verbraucher</h2>
+        <table>
+          <thead><tr><th>Name</th><th>State-Key</th><th></th></tr></thead>
+          <tbody id="consumersBody"></tbody>
+        </table>
+        <div class="row-actions"><button class="secondary" id="addConsumer">+ Verbraucher</button></div>
+      </article>
+
+      <article class="card">
+        <h2>Steuerbare Verbraucher</h2>
+        <table>
+          <thead><tr><th>Name</th><th>State-Key</th><th>Control-Key</th><th></th></tr></thead>
+          <tbody id="controllableBody"></tbody>
+        </table>
+        <div class="row-actions"><button class="secondary" id="addControllable">+ Steuerbarer Verbraucher</button></div>
+      </article>
+
+      <article class="card full">
+        <h2>Erzeuger</h2>
+        <table>
+          <thead><tr><th>Name</th><th>State-Key</th><th>Batterie</th><th></th></tr></thead>
+          <tbody id="generatorsBody"></tbody>
+        </table>
+        <div class="row-actions"><button class="secondary" id="addGenerator">+ Erzeuger</button></div>
+      </article>
+
+      <article class="card full">
+        <h2>Stromnetz (Grid)</h2>
+        <table>
+          <tbody>
+            <tr>
+              <th>Bezug (Import)</th>
+              <td><input id="gridImport" type="text" placeholder="EMS.Grid.Energie.in"></td>
+            </tr>
+            <tr>
+              <th>Einspeisung (Export)</th>
+              <td><input id="gridExport" type="text" placeholder="EMS.Grid.Energie.out"></td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+    </section>
+
+    <section class="card">
+      <div class="row-actions" style="justify-content: space-between; align-items: center;">
+        <div id="status" class="status"></div>
+        <button id="saveBtn">Speichern</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const els = {
+      consumersBody: document.getElementById("consumersBody"),
+      controllableBody: document.getElementById("controllableBody"),
+      generatorsBody: document.getElementById("generatorsBody"),
+      gridImport: document.getElementById("gridImport"),
+      gridExport: document.getElementById("gridExport"),
+      status: document.getElementById("status"),
+      saveBtn: document.getElementById("saveBtn"),
+    };
+
+    function setStatus(text, kind = "") {
+      els.status.textContent = text;
+      els.status.className = kind ? `status ${kind}` : "status";
+    }
+
+    function createInputCell(value = "", placeholder = "") {
+      const td = document.createElement("td");
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = value || "";
+      input.placeholder = placeholder;
+      td.appendChild(input);
+      return {td, input};
+    }
+
+    function createRemoveCell(tbody, tr) {
+      const td = document.createElement("td");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "remove-btn";
+      btn.textContent = "Entfernen";
+      btn.addEventListener("click", () => {
+        tbody.removeChild(tr);
+      });
+      td.appendChild(btn);
+      return td;
+    }
+
+    function addConsumerRow(row = {name: "", state_key: ""}) {
+      const tr = document.createElement("tr");
+      const name = createInputCell(row.name, "z.B. Waschmaschine");
+      const state = createInputCell(row.state_key, "z.B. javascript.0.waschmaschine.energy");
+      tr.appendChild(name.td);
+      tr.appendChild(state.td);
+      tr.appendChild(createRemoveCell(els.consumersBody, tr));
+      els.consumersBody.appendChild(tr);
+    }
+
+    function addControllableRow(row = {name: "", state_key: "", control_key: ""}) {
+      const tr = document.createElement("tr");
+      const name = createInputCell(row.name, "z.B. Ochsner");
+      const state = createInputCell(row.state_key, "Messwert-Status");
+      const control = createInputCell(row.control_key, "Schalt-/Control-State");
+      tr.appendChild(name.td);
+      tr.appendChild(state.td);
+      tr.appendChild(control.td);
+      tr.appendChild(createRemoveCell(els.controllableBody, tr));
+      els.controllableBody.appendChild(tr);
+    }
+
+    function addGeneratorRow(row = {name: "", state_key: "", has_battery: false}) {
+      const tr = document.createElement("tr");
+      const name = createInputCell(row.name, "z.B. PV mit Batterie");
+      const state = createInputCell(row.state_key, "Erzeuger-State");
+      const batteryTd = document.createElement("td");
+      const batteryInput = document.createElement("input");
+      batteryInput.type = "checkbox";
+      batteryInput.checked = !!row.has_battery;
+      batteryTd.appendChild(batteryInput);
+      tr.appendChild(name.td);
+      tr.appendChild(state.td);
+      tr.appendChild(batteryTd);
+      tr.appendChild(createRemoveCell(els.generatorsBody, tr));
+      els.generatorsBody.appendChild(tr);
+    }
+
+    function rowsToObjects(tbody, mapper) {
+      return Array.from(tbody.querySelectorAll("tr"))
+        .map(tr => mapper(tr))
+        .filter(item => item.name || item.state_key || item.control_key);
+    }
+
+    async function loadConfig() {
+      setStatus("Lade Konfiguration...");
+      const res = await fetch("/api/config/datapoints");
+      if (!res.ok) throw new Error("Konfiguration konnte nicht geladen werden");
+      const cfg = await res.json();
+
+      els.consumersBody.innerHTML = "";
+      els.controllableBody.innerHTML = "";
+      els.generatorsBody.innerHTML = "";
+
+      (cfg.consumers || []).forEach(addConsumerRow);
+      (cfg.controllable_consumers || []).forEach(addControllableRow);
+      (cfg.generators || []).forEach(addGeneratorRow);
+
+      els.gridImport.value = cfg.grid?.import_state_key || "";
+      els.gridExport.value = cfg.grid?.export_state_key || "";
+
+      if (!cfg.consumers?.length) addConsumerRow();
+      if (!cfg.controllable_consumers?.length) addControllableRow();
+      if (!cfg.generators?.length) addGeneratorRow();
+
+      setStatus("Konfiguration geladen", "ok");
+    }
+
+    async function saveConfig() {
+      const payload = {
+        consumers: rowsToObjects(els.consumersBody, tr => ({
+          name: tr.children[0].querySelector("input").value.trim(),
+          state_key: tr.children[1].querySelector("input").value.trim(),
+        })),
+        controllable_consumers: rowsToObjects(els.controllableBody, tr => ({
+          name: tr.children[0].querySelector("input").value.trim(),
+          state_key: tr.children[1].querySelector("input").value.trim(),
+          control_key: tr.children[2].querySelector("input").value.trim(),
+        })),
+        generators: rowsToObjects(els.generatorsBody, tr => ({
+          name: tr.children[0].querySelector("input").value.trim(),
+          state_key: tr.children[1].querySelector("input").value.trim(),
+          has_battery: tr.children[2].querySelector("input").checked,
+        })),
+        grid: {
+          import_state_key: els.gridImport.value.trim(),
+          export_state_key: els.gridExport.value.trim(),
+        },
+      };
+
+      setStatus("Speichere...");
+      const res = await fetch("/api/config/datapoints", {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Speichern fehlgeschlagen");
+      setStatus("Konfiguration gespeichert", "ok");
+    }
+
+    document.getElementById("addConsumer").addEventListener("click", () => addConsumerRow());
+    document.getElementById("addControllable").addEventListener("click", () => addControllableRow());
+    document.getElementById("addGenerator").addEventListener("click", () => addGeneratorRow());
+    els.saveBtn.addEventListener("click", async () => {
+      try {
+        await saveConfig();
+      } catch (err) {
+        console.error(err);
+        setStatus("Speichern fehlgeschlagen", "err");
+      }
+    });
+
+    loadConfig().catch(err => {
+      console.error(err);
+      setStatus("Laden fehlgeschlagen", "err");
+    });
+
+    // ── update check ──────────────────────────────────────────────
+    async function checkUpdate() {
+      try {
+        const r = await fetch('/api/update/check');
+        const d = await r.json();
+        if (d.update_available) {
+          const btn = document.getElementById('updateBtn');
+          if (btn) {
+            btn.textContent = `Update → v${d.latest} ↑`;
+            btn.style.display = 'inline-block';
+          }
+        }
+      } catch (_) {}
+    }
+
+    async function applyUpdate() {
+      const btn = document.getElementById('updateBtn');
+      if (btn) { btn.textContent = 'Aktualisiere…'; btn.disabled = true; }
+      try {
+        const r = await fetch('/api/update/apply', { method: 'POST' });
+        const d = await r.json();
+        if (d.status === 'ok') {
+          alert('Update erfolgreich. Server wird neu gestartet…');
+        } else {
+          alert('Fehler beim Update:\n' + (d.output || d.error));
+          if (btn) { btn.disabled = false; }
+        }
+      } catch (e) {
+        alert('Update fehlgeschlagen: ' + e);
+        if (btn) { btn.disabled = false; }
+      }
+    }
+
+    checkUpdate();
+    setInterval(checkUpdate, 60 * 60 * 1000);
+  </script>
+</body>
+</html>
