@@ -644,6 +644,7 @@
 
       let icon = "⚡";
       let line1 = "—";
+      let line1Class = "";
       let line2 = "—";
       let line3 = "—";
       let lbl2 = "Tageswert";
@@ -672,9 +673,21 @@
         lbl3 = "Prognose Verbrauch";
       } else if (device.type === "grid") {
         icon = "🌐";
-        const imp = device.import_power_w !== null && device.import_power_w !== undefined ? `${Number(device.import_power_w).toFixed(0)} W` : "—";
-        const exp = device.export_power_w !== null && device.export_power_w !== undefined ? `${Number(device.export_power_w).toFixed(0)} W` : "—";
-        line1 = `Bezug ${imp} | Einspeisung ${exp}`;
+        const hasImp = device.import_power_w !== null && device.import_power_w !== undefined;
+        const hasExp = device.export_power_w !== null && device.export_power_w !== undefined;
+        const imp = hasImp ? Number(device.import_power_w) : null;
+        const exp = hasExp ? Number(device.export_power_w) : null;
+
+        if (imp === null && exp === null) {
+          line1 = "—";
+        } else if ((exp ?? 0) > 0) {
+          line1 = `Einspeisung ${Number(exp).toFixed(0)} W`;
+          line1Class = "export";
+        } else {
+          line1 = `Bezug ${Number(imp ?? 0).toFixed(0)} W`;
+          line1Class = "import";
+        }
+
         const impE = device.import_value_kwh !== null && device.import_value_kwh !== undefined ? fmt(device.import_value_kwh) : "—";
         const expE = device.export_value_kwh !== null && device.export_value_kwh !== undefined ? fmt(device.export_value_kwh) : "—";
         line2 = `Bezug ${impE} | Einspeisung ${expE}`;
@@ -688,7 +701,7 @@
         <div class="live-item-name">${device.name || "Gerat"}</div>
         <div class="live-item-row">
           <div class="live-item-label">Leistung aktuell</div>
-          <div class="live-item-value">${line1}</div>
+          <div class="live-item-value ${line1Class}">${line1}</div>
         </div>
         <div class="live-item-row">
           <div class="live-item-label">${lbl2}</div>
