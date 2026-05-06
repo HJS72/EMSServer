@@ -63,6 +63,24 @@ class DataPointConfigService:
         config.device_order = [*filtered, *missing]
         return config
 
+    def _migrate_legacy_payload(self, payload: dict) -> dict:
+        """Map old grid power fields to the new single-point schema."""
+        grid = payload.get("grid")
+        if not isinstance(grid, dict):
+            return payload
+
+        if "power_state_key" not in grid or not grid.get("power_state_key"):
+            # Prefer import key for legacy configs; fallback to export key if needed.
+            grid["power_state_key"] = grid.get("import_power_state_key") or grid.get("export_power_state_key") or ""
+
+        if "power_source" not in grid or not grid.get("power_source"):
+            grid["power_source"] = grid.get("import_power_source") or grid.get("export_power_source") or "iobroker"
+
+        if "power_sign" not in grid or not grid.get("power_sign"):
+            grid["power_sign"] = "import_positive"
+
+        return payload
+
     def load(self) -> DataPointConfig:
         if not self._path.exists():
             config = self._default()
@@ -70,6 +88,7 @@ class DataPointConfigService:
             return config
 
         payload = json.loads(self._path.read_text(encoding="utf-8"))
+        payload = self._migrate_legacy_payload(payload)
         config = DataPointConfig.model_validate(payload)
         normalized = self._normalize(config)
         self.save(normalized)

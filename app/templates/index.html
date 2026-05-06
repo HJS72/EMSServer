@@ -294,7 +294,7 @@
     /* Live-View Container */
     .live-view-container {
       display: grid;
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
       gap: 1.2rem;
     }
 
@@ -340,12 +340,6 @@
     .live-category-icon {
       font-size: 1.3rem;
       display: inline-block;
-    }
-
-    .live-items-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.8rem;
     }
 
     .live-item {
@@ -412,9 +406,9 @@
       opacity: 0.8;
     }
 
-    @media (min-width: 768px) {
-      .live-items-grid {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    @media (min-width: 1200px) {
+      .live-view-container {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       }
     }
   </style>
