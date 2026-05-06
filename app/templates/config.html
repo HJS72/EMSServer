@@ -309,7 +309,11 @@
     .field-grid {
       display: grid;
       gap: 0.55rem;
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .field.field-full {
+      grid-column: 1 / -1;
     }
 
     .field {
@@ -368,11 +372,6 @@
     .status.ok { color: var(--good); }
     .status.err { color: var(--warn); }
 
-    @media (min-width: 820px) {
-      .field-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-    }
   </style>
 </head>
 <body>
@@ -632,9 +631,9 @@
       };
     }
 
-    function field(label, key, value, placeholder = "", sourceOptions = false) {
+    function field(label, key, value, placeholder = "", sourceOptions = false, fullWidth = false) {
       const wrap = document.createElement("div");
-      wrap.className = "field";
+      wrap.className = "field" + (fullWidth ? " field-full" : "");
 
       const labelEl = document.createElement("label");
       labelEl.textContent = label;
@@ -668,45 +667,42 @@
       const grid = document.createElement("div");
       grid.className = "field-grid";
 
-      const bind = (k) => ({ setter: (val) => { device[k] = val; renderDevices(); } });
+      // Text inputs: update device data only, no full re-render (prevents focus loss)
+      const bind = (k) => ({
+        setter: (val) => {
+          device[k] = val;
+          if (k === "name") {
+            const card = document.querySelector(`[data-device-id="${device.id}"]`);
+            if (card) {
+              const t = card.querySelector(".device-title");
+              if (t) t.textContent = val || typeMeta[inferType(device)].label;
+            }
+          }
+        }
+      });
+      // Source selects: re-render on change
+      const bindSrc = (k) => ({ setter: (val) => { device[k] = val; renderDevices(); } });
 
       if (inferType(device) === "grid") {
         grid.appendChild(field("Bezug Energie (kWh)", bind("import_state_key"), device.import_state_key, "EMS.Grid.Energie.in"));
-        grid.appendChild(field("Bezug Quelle", bind("import_source"), device.import_source, "", true));
+        grid.appendChild(field("Bezug Quelle", bindSrc("import_source"), device.import_source, "", true));
         grid.appendChild(field("Bezug Leistung (W)", bind("import_power_state_key"), device.import_power_state_key, "EMS.Grid.Leistung.in"));
-        grid.appendChild(field("Bezug Leistung Quelle", bind("import_power_source"), device.import_power_source, "", true));
+        grid.appendChild(field("Bezug Leistung Quelle", bindSrc("import_power_source"), device.import_power_source, "", true));
         grid.appendChild(field("Einspeisung Energie (kWh)", bind("export_state_key"), device.export_state_key, "EMS.Grid.Energie.out"));
-        grid.appendChild(field("Einspeisung Quelle", bind("export_source"), device.export_source, "", true));
+        grid.appendChild(field("Einspeisung Quelle", bindSrc("export_source"), device.export_source, "", true));
         grid.appendChild(field("Einspeisung Leistung (W)", bind("export_power_state_key"), device.export_power_state_key, "EMS.Grid.Leistung.out"));
-        grid.appendChild(field("Einspeisung Leistung Quelle", bind("export_power_source"), device.export_power_source, "", true));
+        grid.appendChild(field("Einspeisung Leistung Quelle", bindSrc("export_power_source"), device.export_power_source, "", true));
       } else {
-        grid.appendChild(field("Name", bind("name"), device.name, "Geratename"));
+        grid.appendChild(field("Name", bind("name"), device.name, "Gerätename", false, true));
         grid.appendChild(field("Energie (kWh)", bind("state_key"), device.state_key, "State-Key Energie"));
-        grid.appendChild(field("Energie Quelle", bind("source"), device.source, "", true));
+        grid.appendChild(field("Energie Quelle", bindSrc("source"), device.source, "", true));
         grid.appendChild(field("Leistung (W)", bind("power_state_key"), device.power_state_key, "State-Key Leistung"));
-        grid.appendChild(field("Leistung Quelle", bind("power_source"), device.power_source, "", true));
+        grid.appendChild(field("Leistung Quelle", bindSrc("power_source"), device.power_source, "", true));
 
         if (inferType(device) === "controllable_consumer") {
-          grid.appendChild(field("Control-Key", bind("control_key"), device.control_key, "Schalt- oder Regel-State"));
+          grid.appendChild(field("Control-Key", bind("control_key"), device.control_key, "Schalt- oder Regel-State", false, true));
         }
 
-        if (inferType(device) === "pv" || inferType(device) === "pv_battery") {
-          const checkWrap = document.createElement("div");
-          checkWrap.className = "checkline";
-          const check = document.createElement("input");
-          check.type = "checkbox";
-          check.checked = inferType(device) === "pv_battery";
-          check.addEventListener("change", () => {
-            device.type = check.checked ? "pv_battery" : "pv";
-            device.has_battery = check.checked;
-            renderDevices();
-          });
-          const text = document.createElement("span");
-          text.textContent = "Batterie vorhanden";
-          checkWrap.appendChild(check);
-          checkWrap.appendChild(text);
-          body.appendChild(checkWrap);
-        }
       }
 
       body.appendChild(grid);
