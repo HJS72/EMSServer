@@ -22,16 +22,19 @@ class IoBrokerSource:
         base = self.settings.iobroker_url.rstrip("/")
         url = f"{base}/getPlainValue/{state_id}"
 
-        async with httpx.AsyncClient(timeout=10.0, auth=self._auth()) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            raw = response.text.strip()
-            if raw == "" or raw.lower() == "null":
-                return None
-            try:
-                return float(raw)
-            except ValueError:
-                return None
+        try:
+            async with httpx.AsyncClient(timeout=10.0, auth=self._auth()) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                raw = response.text.strip()
+                if raw == "" or raw.lower() == "null":
+                    return None
+                try:
+                    return float(raw)
+                except ValueError:
+                    return None
+        except Exception:
+            return None
 
     def get_history(
         self,
@@ -48,10 +51,13 @@ class IoBrokerSource:
             f"&dateTo={quote(date_to.isoformat())}&noHistory=false&aggregate={aggregate}&count={count}"
         )
 
-        with httpx.Client(timeout=20.0, auth=self._auth()) as client:
-            response = client.get(url)
-            response.raise_for_status()
-            payload = response.json()
+        try:
+            with httpx.Client(timeout=20.0, auth=self._auth()) as client:
+                response = client.get(url)
+                response.raise_for_status()
+                payload = response.json()
+        except Exception:
+            return []
 
         points: list[SeriesPoint] = []
         if not isinstance(payload, list):
