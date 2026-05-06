@@ -101,13 +101,15 @@ class ForecastEngine:
         return baseline
 
     def _hourly_consumption_baseline(self) -> dict[int, float]:
-        history = self._safe_influx_history(
-            state_key=self.settings.state_consumption_key,
-            days=self.settings.history_days,
-            custom_query=self.settings.influx_consumption_query,
-        )
-        if not history:
-            history = self._safe_iobroker_history(self.settings.state_consumption_key, self.settings.history_days)
+        history = []
+        if self.settings.state_consumption_key:
+            history = self._safe_influx_history(
+                state_key=self.settings.state_consumption_key,
+                days=self.settings.history_days,
+                custom_query=self.settings.influx_consumption_query,
+            )
+            if not history:
+                history = self._safe_iobroker_history(self.settings.state_consumption_key, self.settings.history_days)
 
         now_local = datetime.now().astimezone()
         grouped: dict[int, list[float]] = defaultdict(list)
@@ -174,18 +176,22 @@ class ForecastEngine:
         return ForecastResponse.model_validate(payload)
 
     async def build_today_actuals(self) -> ActualsResponse:
-        consumption_series = self._safe_influx_today(
-            state_key=self.settings.state_consumption_key,
-            custom_query=self.settings.influx_consumption_query,
-        )
-        if not consumption_series:
-            consumption_series = self._safe_iobroker_today(self.settings.state_consumption_key)
-        pv_series = self._safe_influx_today(
-            state_key=self.settings.state_pv_key,
-            custom_query=self.settings.influx_pv_query,
-        )
-        if not pv_series:
-            pv_series = self._safe_iobroker_today(self.settings.state_pv_key)
+        consumption_series = []
+        if self.settings.state_consumption_key:
+            consumption_series = self._safe_influx_today(
+                state_key=self.settings.state_consumption_key,
+                custom_query=self.settings.influx_consumption_query,
+            )
+            if not consumption_series:
+                consumption_series = self._safe_iobroker_today(self.settings.state_consumption_key)
+        pv_series = []
+        if self.settings.state_pv_key:
+            pv_series = self._safe_influx_today(
+                state_key=self.settings.state_pv_key,
+                custom_query=self.settings.influx_pv_query,
+            )
+            if not pv_series:
+                pv_series = self._safe_iobroker_today(self.settings.state_pv_key)
         grid_import_series = self._safe_influx_today(
             state_key=self.settings.state_grid_import_key,
             custom_query=self.settings.influx_grid_import_query,
@@ -221,8 +227,12 @@ class ForecastEngine:
             )
 
         try:
-            current_consumption = await self.iobroker.get_current_value(self.settings.state_consumption_key)
-            current_pv = await self.iobroker.get_current_value(self.settings.state_pv_key)
+            current_consumption = None
+            if self.settings.state_consumption_key:
+                current_consumption = await self.iobroker.get_current_value(self.settings.state_consumption_key)
+            current_pv = None
+            if self.settings.state_pv_key:
+                current_pv = await self.iobroker.get_current_value(self.settings.state_pv_key)
             now_hour = datetime.now().astimezone().hour
             if current_consumption is not None:
                 points[now_hour].consumption_kwh = round(max(0.0, current_consumption) / 1000.0, 3)
