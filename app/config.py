@@ -49,8 +49,34 @@ def _env(name: str, default: str = "") -> str:
     return os.getenv(name, default).strip()
 
 
+def _load_dotenv_file(path: Path) -> None:
+    """Load KEY=VALUE pairs from a .env file into os.environ if not already set."""
+    if not path.exists() or not path.is_file():
+        return
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key:
+            continue
+
+        value = value.strip()
+        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+            value = value[1:-1]
+
+        os.environ.setdefault(key, value)
+
+
 
 def load_settings() -> Settings:
+    # Local development often starts uvicorn without exported env vars.
+    # Load values from repository .env file if present.
+    _load_dotenv_file(Path(".env"))
+
     data_dir = Path(_env("DATA_DIR", "./data"))
     data_dir.mkdir(parents=True, exist_ok=True)
 
