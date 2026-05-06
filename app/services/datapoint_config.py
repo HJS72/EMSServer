@@ -19,19 +19,49 @@ class DataPointConfigService:
     def _default(self) -> DataPointConfig:
         return DataPointConfig(
             consumers=[
-                ConfigConsumer(name="Waschmaschine", state_key=""),
-                ConfigConsumer(name="Trockner", state_key=""),
+                ConfigConsumer(id="consumer-1", name="Waschmaschine", state_key=""),
+                ConfigConsumer(id="consumer-2", name="Trockner", state_key=""),
             ],
             controllable_consumers=[
-                ConfigControllableConsumer(name="Ochsner", state_key="", control_key=""),
-                ConfigControllableConsumer(name="Klima", state_key="", control_key=""),
+                ConfigControllableConsumer(id="ctrl-1", name="Ochsner", state_key="", control_key=""),
+                ConfigControllableConsumer(id="ctrl-2", name="Klima", state_key="", control_key=""),
             ],
             generators=[
-                ConfigGenerator(name="PV", state_key="", has_battery=False),
-                ConfigGenerator(name="PV mit Batterie", state_key="", has_battery=True),
+                ConfigGenerator(id="gen-1", name="PV", state_key="", has_battery=False),
+                ConfigGenerator(id="gen-2", name="PV mit Batterie", state_key="", has_battery=True),
             ],
-            grid=ConfigGrid(),
+            grid=ConfigGrid(id="grid-main"),
+            device_order=["gen-1", "gen-2", "consumer-1", "consumer-2", "ctrl-1", "ctrl-2", "grid-main"],
         )
+
+    def _normalize(self, config: DataPointConfig) -> DataPointConfig:
+        def ensure_ids(items, prefix: str) -> None:
+            used = set()
+            for idx, item in enumerate(items, start=1):
+                if not item.id:
+                    item.id = f"{prefix}-{idx}"
+                if item.id in used:
+                    item.id = f"{prefix}-{idx}-dup"
+                used.add(item.id)
+
+        ensure_ids(config.generators, "gen")
+        ensure_ids(config.consumers, "consumer")
+        ensure_ids(config.controllable_consumers, "ctrl")
+
+        if not config.grid.id:
+            config.grid.id = "grid-main"
+
+        all_ids = [
+            *(g.id for g in config.generators),
+            *(c.id for c in config.consumers),
+            *(c.id for c in config.controllable_consumers),
+            config.grid.id,
+        ]
+
+        filtered = [device_id for device_id in config.device_order if device_id in all_ids]
+        missing = [device_id for device_id in all_ids if device_id not in filtered]
+        config.device_order = [*filtered, *missing]
+        return config
 
     def load(self) -> DataPointConfig:
         if not self._path.exists():
@@ -40,7 +70,10 @@ class DataPointConfigService:
             return config
 
         payload = json.loads(self._path.read_text(encoding="utf-8"))
-        return DataPointConfig.model_validate(payload)
+        config = DataPointConfig.model_validate(payload)
+        normalized = self._normalize(config)
+        self.save(normalized)
+        return normalized
 
     def save(self, config: DataPointConfig) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)

@@ -118,10 +118,11 @@ async def put_datapoint_config(payload: DataPointConfig) -> JSONResponse:
 async def livedata_all() -> JSONResponse:
     config = config_service.load()
     result = {
+        "devices": [],
         "consumers": [],
         "controllable_consumers": [],
         "generators": [],
-        "grid": {"import_value": None, "export_value": None},
+        "grid": {"import_value": None, "export_value": None, "import_power": None, "export_power": None},
     }
 
     async def get_value(state_key: str, source: str) -> float | None:
@@ -137,18 +138,91 @@ async def livedata_all() -> JSONResponse:
 
     for consumer in config.consumers:
         val = await get_value(consumer.state_key, consumer.source)
-        result["consumers"].append({"name": consumer.name, "state_key": consumer.state_key, "source": consumer.source, "value_kwh": val})
+        power_val = await get_value(consumer.power_state_key, consumer.power_source)
+        result["consumers"].append({
+            "id": consumer.id,
+            "name": consumer.name, 
+            "state_key": consumer.state_key, 
+            "source": consumer.source, 
+            "value_kwh": val,
+            "power_state_key": consumer.power_state_key,
+            "power_source": consumer.power_source,
+            "power_w": power_val
+        })
 
     for cc in config.controllable_consumers:
         val = await get_value(cc.state_key, cc.source)
-        result["controllable_consumers"].append({"name": cc.name, "state_key": cc.state_key, "source": cc.source, "value_kwh": val})
+        power_val = await get_value(cc.power_state_key, cc.power_source)
+        result["controllable_consumers"].append({
+            "id": cc.id,
+            "name": cc.name, 
+            "state_key": cc.state_key, 
+            "source": cc.source, 
+            "value_kwh": val,
+            "power_state_key": cc.power_state_key,
+            "power_source": cc.power_source,
+            "power_w": power_val
+        })
 
     for gen in config.generators:
         val = await get_value(gen.state_key, gen.source)
-        result["generators"].append({"name": gen.name, "state_key": gen.state_key, "has_battery": gen.has_battery, "source": gen.source, "value_kwh": val})
+        power_val = await get_value(gen.power_state_key, gen.power_source)
+        result["generators"].append({
+            "id": gen.id,
+            "name": gen.name, 
+            "state_key": gen.state_key, 
+            "has_battery": gen.has_battery, 
+            "source": gen.source, 
+            "value_kwh": val,
+            "power_state_key": gen.power_state_key,
+            "power_source": gen.power_source,
+            "power_w": power_val
+        })
 
     result["grid"]["import_value"] = await get_value(config.grid.import_state_key, config.grid.import_source)
     result["grid"]["export_value"] = await get_value(config.grid.export_state_key, config.grid.export_source)
+    result["grid"]["import_power"] = await get_value(config.grid.import_power_state_key, config.grid.import_power_source)
+    result["grid"]["export_power"] = await get_value(config.grid.export_power_state_key, config.grid.export_power_source)
+
+    id_to_device = {}
+    for item in result["generators"]:
+        id_to_device[item["id"]] = {
+            "id": item["id"],
+            "type": "pv_battery" if item.get("has_battery") else "pv",
+            "name": item["name"],
+            "value_kwh": item["value_kwh"],
+            "power_w": item["power_w"],
+        }
+    for item in result["consumers"]:
+        id_to_device[item["id"]] = {
+            "id": item["id"],
+            "type": "consumer",
+            "name": item["name"],
+            "value_kwh": item["value_kwh"],
+            "power_w": item["power_w"],
+        }
+    for item in result["controllable_consumers"]:
+        id_to_device[item["id"]] = {
+            "id": item["id"],
+            "type": "controllable_consumer",
+            "name": item["name"],
+            "value_kwh": item["value_kwh"],
+            "power_w": item["power_w"],
+        }
+
+    id_to_device[config.grid.id] = {
+        "id": config.grid.id,
+        "type": "grid",
+        "name": "Netz",
+        "import_value_kwh": result["grid"]["import_value"],
+        "export_value_kwh": result["grid"]["export_value"],
+        "import_power_w": result["grid"]["import_power"],
+        "export_power_w": result["grid"]["export_power"],
+    }
+
+    for device_id in config.device_order:
+        if device_id in id_to_device:
+            result["devices"].append(id_to_device[device_id])
 
     return JSONResponse(result)
 

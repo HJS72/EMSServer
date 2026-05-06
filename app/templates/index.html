@@ -34,42 +34,120 @@
 
     .wrap {
       width: min(1180px, calc(100% - 2rem));
-      margin: 1.2rem auto 2rem;
+      margin: calc(52px + 1.2rem) auto calc(36px + 2rem);
       display: grid;
       gap: 1rem;
     }
 
-    .menu {
+    /* ── App Header ────────────────────────────────────────────── */
+    .app-header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 200;
+      height: 52px;
+      background: #060e16f0;
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+    }
+
+    .app-header-inner {
+      height: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
       display: flex;
-      gap: 0.65rem;
       align-items: center;
+      gap: 1rem;
+    }
+
+    .app-brand {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+
+    .app-brand-icon { font-size: 1.25rem; line-height: 1; }
+
+    .app-brand-name {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--primary);
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+    }
+
+    .app-nav {
+      display: flex;
+      gap: 0.3rem;
       background: #0b1825cc;
       border: 1px solid var(--line);
       border-radius: 999px;
-      padding: 0.35rem;
-      width: fit-content;
-      backdrop-filter: blur(6px);
+      padding: 0.28rem;
     }
 
-    .menu a {
+    .app-nav a {
       color: var(--muted);
       text-decoration: none;
-      padding: 0.38rem 0.8rem;
+      padding: 0.3rem 0.75rem;
       border-radius: 999px;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       border: 1px solid transparent;
-      transition: 180ms ease;
+      transition: 150ms ease;
     }
 
-    .menu a.active {
+    .app-nav a.active {
       color: #eaf5ff;
       background: #1a3149;
       border-color: #2a4a67;
     }
 
-    .menu a:hover {
+    .app-nav a:hover:not(.active) {
       color: #eaf5ff;
       border-color: #2a4a67;
+    }
+
+    /* ── App Footer ────────────────────────────────────────────── */
+    .app-footer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 200;
+      height: 36px;
+      background: #050d14e8;
+      border-top: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+    }
+
+    .app-footer-inner {
+      height: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .footer-status {
+      font-size: 0.8rem;
+      color: var(--muted);
+      transition: color 0.3s ease;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .footer-status.ok   { color: var(--ok); }
+    .footer-status.err  { color: var(--warn); }
+    .footer-status.info { color: var(--primary); }
+
+    .footer-time {
+      font-size: 0.75rem;
+      color: #3a5a72;
+      white-space: nowrap;
     }
 
     .hero {
@@ -212,22 +290,152 @@
         opacity: 1;
       }
     }
+
+    /* Live-View Container */
+    .live-view-container {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.2rem;
+    }
+
+    .live-category {
+      background: linear-gradient(180deg, rgba(13,27,42,0.8) 0%, rgba(19,38,59,0.8) 100%);
+      border-radius: 12px;
+      padding: 0.9rem;
+      border: 1px solid;
+      animation: rise 650ms ease-out;
+    }
+
+    .live-category.pv {
+      border-color: #ffb703 33%;
+      box-shadow: inset 0 0 16px #ffb70310, 0 8px 24px #ffb70315;
+    }
+
+    .live-category.consumer {
+      border-color: #4cc9f033%;
+      box-shadow: inset 0 0 16px #4cc9f010, 0 8px 24px #4cc9f015;
+    }
+
+    .live-category.grid {
+      border-color: #90e0ef33%;
+      box-shadow: inset 0 0 16px #90e0ef10, 0 8px 24px #90e0ef15;
+    }
+
+    .live-category-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #e8f0f7;
+      margin-bottom: 0.8rem;
+      padding-bottom: 0.6rem;
+      border-bottom: 1px solid;
+    }
+
+    .live-category.pv .live-category-title { border-color: #ffb70330; }
+    .live-category.consumer .live-category-title { border-color: #4cc9f030; }
+    .live-category.grid .live-category-title { border-color: #90e0ef30; }
+
+    .live-category-icon {
+      font-size: 1.3rem;
+      display: inline-block;
+    }
+
+    .live-items-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.8rem;
+    }
+
+    .live-item {
+      background: rgba(7,17,26,0.6);
+      border-radius: 10px;
+      padding: 0.8rem;
+      border: 1px solid;
+      transition: all 200ms ease;
+    }
+
+    .live-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px #00000033;
+    }
+
+    .live-category.pv .live-item {
+      border-color: #ffb70330;
+      background: linear-gradient(135deg, rgba(255,183,3,0.08) 0%, rgba(255,183,3,0.02) 100%);
+    }
+
+    .live-category.consumer .live-item {
+      border-color: #4cc9f030;
+      background: linear-gradient(135deg, rgba(76,201,240,0.08) 0%, rgba(76,201,240,0.02) 100%);
+    }
+
+    .live-category.grid .live-item {
+      border-color: #90e0ef30;
+      background: linear-gradient(135deg, rgba(144,224,239,0.08) 0%, rgba(144,224,239,0.02) 100%);
+    }
+
+    .live-item-name {
+      font-size: 0.9rem;
+      color: #d6e4f0;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+
+    .live-item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 0.35rem 0;
+      font-size: 0.82rem;
+    }
+
+    .live-item-label {
+      color: #9bb0c3;
+      flex: 1;
+    }
+
+    .live-item-value {
+      font-weight: 600;
+      text-align: right;
+    }
+
+    .live-category.pv .live-item-value { color: #ffb703; }
+    .live-category.consumer .live-item-value { color: #4cc9f0; }
+    .live-category.grid .live-item-value.import { color: #e76f51; }
+    .live-category.grid .live-item-value.export { color: #52b788; }
+
+    .live-item-icon {
+      font-size: 1.8rem;
+      margin-bottom: 0.4rem;
+      opacity: 0.8;
+    }
+
+    @media (min-width: 768px) {
+      .live-items-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      }
+    }
   </style>
 </head>
 <body>
-  <main class="wrap">
-    <nav class="menu" aria-label="Hauptmenu">
-      <a class="active" href="/">Dashboard</a>
-      <a href="/config">Konfiguration</a>
-    </nav>
-
-    <section class="hero">
-      <h1>Stromverbrauch- und PV-Vorhersage
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="app-brand">
+        <span class="app-brand-icon">⚡</span>
+        <span class="app-brand-name">EMS Forecast</span>
         <span class="version-badge" id="versionBadge">v{{ version }}</span>
         <button class="update-btn" id="updateBtn" onclick="applyUpdate()">Update verfügbar ↑</button>
-      </h1>
-    </section>
+      </div>
+      <nav class="app-nav" aria-label="Hauptmenu">
+        <a class="active" href="/">Dashboard</a>
+        <a href="/config">Konfiguration</a>
+      </nav>
+    </div>
+  </header>
 
+  <main class="wrap">
     <section class="kpis">
       <article class="kpi"><div class="label">Prognose Verbrauch heute</div><div class="value" id="kpiForecastConsumption">-</div></article>
       <article class="kpi"><div class="label">Prognose PV heute</div><div class="value" id="kpiForecastPv">-</div></article>
@@ -236,22 +444,9 @@
     </section>
 
     <section class="panel">
-      <h2>Konfigurierte Elemente (Live)</h2>
-      <div id="elementsContainer" style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; color: var(--text);">
-          <thead>
-            <tr style="border-bottom: 1px solid var(--line);">
-              <th style="text-align: left; padding: 0.6rem; color: var(--muted);">Element</th>
-              <th style="text-align: left; padding: 0.6rem; color: var(--muted);">Typ</th>
-              <th style="text-align: right; padding: 0.6rem; color: var(--muted);">Leistung aktuell</th>
-              <th style="text-align: right; padding: 0.6rem; color: var(--muted);">Tagesverbrauch</th>
-              <th style="text-align: left; padding: 0.6rem; color: var(--muted);">Quelle</th>
-            </tr>
-          </thead>
-          <tbody id="elementsTable"></tbody>
-        </table>
-      </div>
-      <div class="hint">Live-Daten von konfigurierten Verbrauchern, Generatoren und Stromnetz</div>
+      <h2>Live-Ansicht</h2>
+      <div id="liveViewContainer" class="live-view-container"></div>
+      <div class="hint">Echtzeitdaten je Gerät in der Reihenfolge aus der Konfiguration</div>
     </section>
 
     <section class="panel">
@@ -278,7 +473,31 @@
     </section>
   </main>
 
+  <footer class="app-footer">
+    <div class="app-footer-inner">
+      <span id="footerStatus" class="footer-status"></span>
+      <span id="footerTime" class="footer-time"></span>
+    </div>
+  </footer>
+
   <script>
+    // ── Footer helpers ─────────────────────────────────────────
+    function showFooterStatus(msg, kind = '') {
+      const el = document.getElementById('footerStatus');
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'footer-status' + (kind ? ` ${kind}` : '');
+      const timeEl = document.getElementById('footerTime');
+      if (timeEl && msg) timeEl.textContent = new Date().toLocaleTimeString('de-DE');
+      if (kind === 'ok' || kind === 'info') {
+        clearTimeout(el._timer);
+        el._timer = setTimeout(() => {
+          el.textContent = '';
+          el.className = 'footer-status';
+        }, 5000);
+      }
+    }
+
     const state = {
       forecast: null,
       actuals: null,
@@ -399,85 +618,89 @@
       });
     }
 
-    async function updateElementsTable() {
+    async function updateLiveView() {
       try {
         const livedata = await fetchJson("/api/livedata/all");
-        const tbody = document.getElementById("elementsTable");
-        tbody.innerHTML = "";
+        const container = document.getElementById("liveViewContainer");
+        container.innerHTML = "";
 
-        const rows = [];
+        const forecastTotals = {
+          pv: sumByKey(state.forecast?.points || [], "pv_kwh"),
+          consumption: sumByKey(state.forecast?.points || [], "consumption_kwh")
+        };
 
-        // Verbraucher
-        (livedata.consumers || []).forEach(c => {
-          rows.push({
-            name: c.name,
-            type: "Verbraucher",
-            power: c.value_kwh,
-            consumption: c.value_kwh,
-            source: c.source
-          });
-        });
-
-        // Steuerbare Verbraucher
-        (livedata.controllable_consumers || []).forEach(c => {
-          rows.push({
-            name: c.name,
-            type: "Heizung/Klima",
-            power: c.value_kwh,
-            consumption: c.value_kwh,
-            source: c.source
-          });
-        });
-
-        // Generatoren
-        (livedata.generators || []).forEach(g => {
-          rows.push({
-            name: g.name,
-            type: g.has_battery ? "PV + Speicher" : "PV",
-            power: g.value_kwh,
-            consumption: g.value_kwh,
-            source: g.source
-          });
-        });
-
-        // Stromnetz
-        if (livedata.grid) {
-          rows.push({
-            name: "Netz (Import)",
-            type: "Stromnetz",
-            power: livedata.grid.import_value,
-            consumption: livedata.grid.import_value,
-            source: "grid"
-          });
-          rows.push({
-            name: "Netz (Export)",
-            type: "Stromnetz",
-            power: livedata.grid.export_value,
-            consumption: livedata.grid.export_value,
-            source: "grid"
-          });
-        }
-
-        rows.forEach(row => {
-          const tr = document.createElement("tr");
-          tr.style.borderBottom = "1px solid var(--line)";
-          
-          const powerVal = row.power ? fmtPower(row.power) : "—";
-          const consumptionVal = row.consumption ? fmt(row.consumption) : "—";
-          const sourceLabel_val = row.source === "grid" ? "Netz" : sourceLabel(row.source);
-
-          tr.innerHTML = `
-            <td style="padding: 0.6rem; color: #e8f0f7;">${row.name}</td>
-            <td style="padding: 0.6rem; color: var(--muted);">${row.type}</td>
-            <td style="padding: 0.6rem; text-align: right; color: #ffb703; font-weight: 600;">${powerVal}</td>
-            <td style="padding: 0.6rem; text-align: right; color: #4cc9f0;">${consumptionVal}</td>
-            <td style="padding: 0.6rem; color: var(--muted); font-size: 0.85rem;">${sourceLabel_val}</td>
-          `;
-          tbody.appendChild(tr);
+        const devices = livedata.devices || [];
+        devices.forEach(device => {
+          container.appendChild(createLiveDeviceCard(device, forecastTotals));
         });
       } catch (err) {
-        console.error("Error loading elements:", err);
+        console.error("Error loading live view:", err);
       }
+    }
+
+    function createLiveDeviceCard(device, forecastTotals) {
+      const itemEl = document.createElement("div");
+      itemEl.className = "live-item";
+
+      let icon = "⚡";
+      let line1 = "—";
+      let line2 = "—";
+      let line3 = "—";
+      let lbl2 = "Tageswert";
+      let lbl3 = "Prognose";
+
+      if (device.type === "pv") {
+        icon = "☀️";
+        line1 = device.power_w !== null && device.power_w !== undefined ? `${Number(device.power_w).toFixed(0)} W` : "—";
+        line2 = device.value_kwh !== null && device.value_kwh !== undefined ? fmt(device.value_kwh) : "—";
+        line3 = forecastTotals.pv ? fmt(forecastTotals.pv) : "—";
+        lbl2 = "Tagesertrag";
+        lbl3 = "Prognose Ertrag";
+      } else if (device.type === "pv_battery") {
+        icon = "🔋";
+        line1 = device.power_w !== null && device.power_w !== undefined ? `${Number(device.power_w).toFixed(0)} W` : "—";
+        line2 = device.value_kwh !== null && device.value_kwh !== undefined ? fmt(device.value_kwh) : "—";
+        line3 = forecastTotals.pv ? fmt(forecastTotals.pv) : "—";
+        lbl2 = "Tagesertrag";
+        lbl3 = "Prognose Ertrag";
+      } else if (device.type === "consumer" || device.type === "controllable_consumer") {
+        icon = device.type === "controllable_consumer" ? "🧠" : "🔌";
+        line1 = device.power_w !== null && device.power_w !== undefined ? `${Number(device.power_w).toFixed(0)} W` : "—";
+        line2 = device.value_kwh !== null && device.value_kwh !== undefined ? fmt(device.value_kwh) : "—";
+        line3 = forecastTotals.consumption ? fmt(forecastTotals.consumption) : "—";
+        lbl2 = "Tagesverbrauch";
+        lbl3 = "Prognose Verbrauch";
+      } else if (device.type === "grid") {
+        icon = "🌐";
+        const imp = device.import_power_w !== null && device.import_power_w !== undefined ? `${Number(device.import_power_w).toFixed(0)} W` : "—";
+        const exp = device.export_power_w !== null && device.export_power_w !== undefined ? `${Number(device.export_power_w).toFixed(0)} W` : "—";
+        line1 = `Bezug ${imp} | Einspeisung ${exp}`;
+        const impE = device.import_value_kwh !== null && device.import_value_kwh !== undefined ? fmt(device.import_value_kwh) : "—";
+        const expE = device.export_value_kwh !== null && device.export_value_kwh !== undefined ? fmt(device.export_value_kwh) : "—";
+        line2 = `Bezug ${impE} | Einspeisung ${expE}`;
+        line3 = `PV ${forecastTotals.pv ? fmt(forecastTotals.pv) : "—"} | Last ${forecastTotals.consumption ? fmt(forecastTotals.consumption) : "—"}`;
+        lbl2 = "Energie heute";
+        lbl3 = "Prognose";
+      }
+
+      itemEl.innerHTML = `
+        <div class="live-item-icon">${icon}</div>
+        <div class="live-item-name">${device.name || "Gerat"}</div>
+        <div class="live-item-row">
+          <div class="live-item-label">Leistung aktuell</div>
+          <div class="live-item-value">${line1}</div>
+        </div>
+        <div class="live-item-row">
+          <div class="live-item-label">${lbl2}</div>
+          <div class="live-item-value">${line2}</div>
+        </div>
+        <div class="live-item-row">
+          <div class="live-item-label">${lbl3}</div>
+          <div class="live-item-value">${line3}</div>
+        </div>
+      `;
+
+      return itemEl;
     }
 
     function createHistoryChart() {
@@ -528,14 +751,16 @@
         createForecastChart();
         createCompareChart();
         createHistoryChart();
+        showFooterStatus('Daten aktualisiert', 'ok');
       } catch (err) {
         console.error(err);
+        showFooterStatus('Fehler beim Laden der Daten', 'err');
       }
     }
 
-    // Update elements table more frequently (every 30 seconds)
-    updateElementsTable();
-    setInterval(updateElementsTable, 30 * 1000);
+    // Update live view more frequently (every 30 seconds)
+    updateLiveView();
+    setInterval(updateLiveView, 30 * 1000);
 
     init();
     setInterval(init, 15 * 60 * 1000);

@@ -36,30 +36,44 @@ class CompareResponse(BaseModel):
 
 
 class ConfigConsumer(BaseModel):
+    id: str = ""
     name: str
     state_key: str
-    source: str = "influx"  # "influx" oder "iobroker"
+    power_state_key: str = ""  # Leistung in W aus ioBroker
+    source: str = "influx"  # "influx" oder "iobroker" für Energie
+    power_source: str = "iobroker"  # Leistung kommt typischerweise von ioBroker
 
 
 class ConfigControllableConsumer(BaseModel):
+    id: str = ""
     name: str
     state_key: str
+    power_state_key: str = ""  # Leistung in W aus ioBroker
     control_key: str = ""
-    source: str = "influx"  # "influx" oder "iobroker"
+    source: str = "influx"  # "influx" oder "iobroker" für Energie
+    power_source: str = "iobroker"  # Leistung kommt typischerweise von ioBroker
 
 
 class ConfigGenerator(BaseModel):
+    id: str = ""
     name: str
     state_key: str
+    power_state_key: str = ""  # Leistung in W aus ioBroker
     has_battery: bool = False
-    source: str = "influx"  # "influx" oder "iobroker"
+    source: str = "influx"  # "influx" oder "iobroker" für Energie
+    power_source: str = "iobroker"  # Leistung kommt typischerweise von ioBroker
 
 
 class ConfigGrid(BaseModel):
+    id: str = "grid-main"
     import_state_key: str = "EMS.Grid.Energie.in"
     export_state_key: str = "EMS.Grid.Energie.out"
-    import_source: str = "influx"  # "influx" oder "iobroker"
-    export_source: str = "influx"  # "influx" oder "iobroker"
+    import_power_state_key: str = ""  # Aktuelle Leistung Import (W)
+    export_power_state_key: str = ""  # Aktuelle Leistung Export (W)
+    import_source: str = "influx"  # "influx" oder "iobroker" für Energie
+    export_source: str = "influx"  # "influx" oder "iobroker" für Energie
+    import_power_source: str = "iobroker"  # Leistung kommt typischerweise von ioBroker
+    export_power_source: str = "iobroker"  # Leistung kommt typischerweise von ioBroker
 
 
 class DataPointConfig(BaseModel):
@@ -67,3 +81,4 @@ class DataPointConfig(BaseModel):
     controllable_consumers: list[ConfigControllableConsumer] = Field(default_factory=list)
     generators: list[ConfigGenerator] = Field(default_factory=list)
     grid: ConfigGrid = Field(default_factory=ConfigGrid)
+    device_order: list[str] = Field(default_factory=list)

@@ -14,11 +14,10 @@
       --line: #1f3347;
       --good: #52b788;
       --warn: #e76f51;
+      --focus: #4cc9f0;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -33,43 +32,121 @@
     }
 
     .wrap {
-      width: min(1220px, calc(100% - 2rem));
-      margin: 1.2rem auto 2rem;
+      width: min(1120px, calc(100% - 2rem));
+      margin: calc(52px + 1.2rem) auto calc(36px + 2rem);
       display: grid;
       gap: 1rem;
     }
 
-    .menu {
+    /* ── App Header ────────────────────────────────────────────── */
+    .app-header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 200;
+      height: 52px;
+      background: #060e16f0;
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+    }
+
+    .app-header-inner {
+      height: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
       display: flex;
-      gap: 0.65rem;
       align-items: center;
+      gap: 1rem;
+    }
+
+    .app-brand {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+
+    .app-brand-icon { font-size: 1.25rem; line-height: 1; }
+
+    .app-brand-name {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--focus);
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+    }
+
+    .app-nav {
+      display: flex;
+      gap: 0.3rem;
       background: #0b1825cc;
       border: 1px solid var(--line);
       border-radius: 999px;
-      padding: 0.35rem;
-      width: fit-content;
-      backdrop-filter: blur(6px);
+      padding: 0.28rem;
     }
 
-    .menu a {
+    .app-nav a {
       color: var(--muted);
       text-decoration: none;
-      padding: 0.38rem 0.8rem;
+      padding: 0.3rem 0.75rem;
       border-radius: 999px;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       border: 1px solid transparent;
-      transition: 180ms ease;
+      transition: 150ms ease;
     }
 
-    .menu a.active {
+    .app-nav a.active {
       color: #eaf5ff;
       background: #1a3149;
       border-color: #2a4a67;
     }
 
-    .menu a:hover {
+    .app-nav a:hover:not(.active) {
       color: #eaf5ff;
       border-color: #2a4a67;
+    }
+
+    /* ── App Footer ────────────────────────────────────────────── */
+    .app-footer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 200;
+      height: 36px;
+      background: #050d14e8;
+      border-top: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+    }
+
+    .app-footer-inner {
+      height: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .footer-status {
+      font-size: 0.8rem;
+      color: var(--muted);
+      transition: color 0.3s ease;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .footer-status.ok   { color: var(--good); }
+    .footer-status.err  { color: var(--warn); }
+    .footer-status.info { color: var(--focus); }
+
+    .footer-time {
+      font-size: 0.75rem;
+      color: #3a5a72;
+      white-space: nowrap;
     }
 
     .hero {
@@ -116,18 +193,12 @@
 
     @keyframes pulse-warn {
       0%, 100% { box-shadow: 0 0 0 0 #e76f5166; }
-      50%       { box-shadow: 0 0 0 6px #e76f5100; }
+      50% { box-shadow: 0 0 0 6px #e76f5100; }
     }
 
     .hero p {
       margin: 0.45rem 0 0;
       color: #bfd4e4;
-    }
-
-    .grid {
-      display: grid;
-      gap: 1rem;
-      grid-template-columns: 1fr;
     }
 
     .card {
@@ -138,43 +209,120 @@
       box-shadow: inset 0 1px 0 #ffffff08, 0 14px 36px #02060c40;
     }
 
-    .card h2 {
-      margin: 0 0 0.75rem;
-      font-size: 1rem;
-      text-transform: uppercase;
-      letter-spacing: 0.25px;
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toolbar-left {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      align-items: center;
+    }
+
+    .toolbar strong {
+      font-size: 0.95rem;
       color: #d6e4f0;
     }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
+    .devices {
+      display: grid;
+      gap: 0.75rem;
     }
 
-    th,
-    td {
-      text-align: left;
-      padding: 0.45rem;
-      border-bottom: 1px solid #21364a;
-      vertical-align: middle;
+    .device-card {
+      border: 1px solid #2a4158;
+      border-radius: 12px;
+      background: #0a1622cc;
+      overflow: hidden;
     }
 
-    th {
-      color: #b9cad9;
+    .device-card.dragging {
+      opacity: 0.55;
+      border-color: var(--focus);
+    }
+
+    .device-card.drop-target {
+      border-color: var(--focus);
+      box-shadow: 0 0 0 1px var(--focus) inset;
+    }
+
+    .device-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 0.75rem;
+      background: #0f2233;
+      border-bottom: 1px solid #203449;
+    }
+
+    .drag-handle {
+      cursor: grab;
+      color: #8fb5d1;
+      user-select: none;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .drag-handle:active { cursor: grabbing; }
+
+    .device-title-wrap {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .device-title {
+      font-size: 0.95rem;
       font-weight: 600;
-      font-size: 0.85rem;
+      color: #eef5fb;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    input[type="text"] {
-      width: 100%;
-      border: 1px solid #2b465f;
-      background: #0a1622;
-      color: #ebf4fb;
-      border-radius: 8px;
-      padding: 0.45rem 0.55rem;
-      font-size: 0.9rem;
+    .device-type {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 0.1rem;
     }
 
+    .device-actions {
+      display: flex;
+      gap: 0.45rem;
+      align-items: center;
+    }
+
+    .device-body {
+      padding: 0.75rem;
+      display: grid;
+      gap: 0.55rem;
+    }
+
+    .device-card.collapsed .device-body {
+      display: none;
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 0.55rem;
+      grid-template-columns: 1fr;
+    }
+
+    .field {
+      display: grid;
+      gap: 0.25rem;
+    }
+
+    .field label {
+      font-size: 0.79rem;
+      color: #a9bfd2;
+    }
+
+    input[type="text"],
     select {
       width: 100%;
       border: 1px solid #2b465f;
@@ -186,14 +334,15 @@
     }
 
     input[type="checkbox"] {
-      transform: scale(1.1);
+      transform: translateY(1px);
     }
 
-    .row-actions {
+    .checkline {
       display: flex;
+      align-items: center;
       gap: 0.45rem;
-      justify-content: flex-end;
-      margin-top: 0.65rem;
+      color: #c9d9e7;
+      font-size: 0.86rem;
     }
 
     button {
@@ -206,18 +355,9 @@
       cursor: pointer;
     }
 
-    button:hover {
-      background: #1d3c59;
-    }
-
-    button.secondary {
-      background: #0d1d2c;
-    }
-
-    .remove-btn {
-      border-color: #6b2e2e;
-      background: #3a1d1d;
-    }
+    button:hover { background: #1d3c59; }
+    button.secondary { background: #0d1d2c; }
+    button.remove-btn { border-color: #6b2e2e; background: #3a1d1d; }
 
     .status {
       font-size: 0.9rem;
@@ -225,200 +365,523 @@
       min-height: 1.4em;
     }
 
-    .status.ok {
-      color: var(--good);
-    }
+    .status.ok { color: var(--good); }
+    .status.err { color: var(--warn); }
 
-    .status.err {
-      color: var(--warn);
-    }
-
-    @media (min-width: 980px) {
-      .grid {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .card.full {
-        grid-column: 1 / -1;
+    @media (min-width: 820px) {
+      .field-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
   </style>
 </head>
 <body>
-  <main class="wrap">
-    <nav class="menu" aria-label="Hauptmenu">
-      <a href="/">Dashboard</a>
-      <a class="active" href="/config">Konfiguration</a>
-    </nav>
-
-    <section class="hero">
-      <h1>Datenpunkt-Konfiguration
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="app-brand">
+        <span class="app-brand-icon">⚡</span>
+        <span class="app-brand-name">EMS Forecast</span>
         <span class="version-badge" id="versionBadge">v{{ version }}</span>
         <button class="update-btn" id="updateBtn" onclick="applyUpdate()">Update verfügbar ↑</button>
-      </h1>
-      <p>Verwalte Verbraucher, steuerbare Verbraucher, Erzeuger und Grid-Datenpunkte zentral.</p>
-    </section>
+      </div>
+      <nav class="app-nav" aria-label="Hauptmenu">
+        <a href="/">Dashboard</a>
+        <a class="active" href="/config">Konfiguration</a>
+      </nav>
+    </div>
+  </header>
 
-    <section class="grid">
-      <article class="card">
-        <h2>Reine Verbraucher</h2>
-        <table>
-          <thead><tr><th>Name</th><th>State-Key</th><th>Quelle</th><th></th></tr></thead>
-          <tbody id="consumersBody"></tbody>
-        </table>
-        <div class="row-actions"><button class="secondary" id="addConsumer">+ Verbraucher</button></div>
-      </article>
-
-      <article class="card">
-        <h2>Steuerbare Verbraucher</h2>
-        <table>
-          <thead><tr><th>Name</th><th>State-Key</th><th>Control-Key</th><th>Quelle</th><th></th></tr></thead>
-          <tbody id="controllableBody"></tbody>
-        </table>
-        <div class="row-actions"><button class="secondary" id="addControllable">+ Steuerbarer Verbraucher</button></div>
-      </article>
-
-      <article class="card full">
-        <h2>Erzeuger</h2>
-        <table>
-          <thead><tr><th>Name</th><th>State-Key</th><th>Batterie</th><th>Quelle</th><th></th></tr></thead>
-          <tbody id="generatorsBody"></tbody>
-        </table>
-        <div class="row-actions"><button class="secondary" id="addGenerator">+ Erzeuger</button></div>
-      </article>
-
-      <article class="card full">
-        <h2>Stromnetz (Grid)</h2>
-        <table>
-          <tbody>
-            <tr>
-              <th>Bezug (Import)</th>
-              <td><input id="gridImport" type="text" placeholder="EMS.Grid.Energie.in"></td>
-              <td><select id="gridImportSource"><option value="influx">InfluxDB</option><option value="iobroker">ioBroker</option></select></td>
-            </tr>
-            <tr>
-              <th>Einspeisung (Export)</th>
-              <td><input id="gridExport" type="text" placeholder="EMS.Grid.Energie.out"></td>
-              <td><select id="gridExportSource"><option value="influx">InfluxDB</option><option value="iobroker">ioBroker</option></select></td>
-            </tr>
-          </tbody>
-        </table>
-      </article>
+  <main class="wrap">
+    <section class="card">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <strong>Gerate</strong>
+          <select id="newDeviceType">
+            <option value="pv">PV-Anlage</option>
+            <option value="pv_battery">PV-Anlage mit Batterie</option>
+            <option value="consumer">Verbraucher</option>
+            <option value="controllable_consumer">Steuerbarer Verbraucher</option>
+            <option value="grid">Netz</option>
+          </select>
+          <button class="secondary" id="addDeviceBtn">+ Gerat</button>
+        </div>
+        <div id="status" class="status"></div>
+      </div>
     </section>
 
     <section class="card">
-      <div class="row-actions" style="justify-content: space-between; align-items: center;">
-        <div id="status" class="status"></div>
+      <div id="devices" class="devices"></div>
+      <div class="toolbar" style="margin-top: 0.75rem;">
+        <span class="status">Hinweis: Karten per Griff links verschieben, um die Reihenfolge zu andern.</span>
         <button id="saveBtn">Speichern</button>
       </div>
     </section>
   </main>
 
+  <footer class="app-footer">
+    <div class="app-footer-inner">
+      <span id="footerStatus" class="footer-status"></span>
+      <span id="footerTime" class="footer-time"></span>
+    </div>
+  </footer>
+
   <script>
     const els = {
-      consumersBody: document.getElementById("consumersBody"),
-      controllableBody: document.getElementById("controllableBody"),
-      generatorsBody: document.getElementById("generatorsBody"),
-      gridImport: document.getElementById("gridImport"),
-      gridExport: document.getElementById("gridExport"),
-      gridImportSource: document.getElementById("gridImportSource"),
-      gridExportSource: document.getElementById("gridExportSource"),
+      devices: document.getElementById("devices"),
       status: document.getElementById("status"),
       saveBtn: document.getElementById("saveBtn"),
+      addDeviceBtn: document.getElementById("addDeviceBtn"),
+      newDeviceType: document.getElementById("newDeviceType"),
+    };
+
+    const appState = {
+      devices: [],
+      dragId: "",
+    };
+
+    const typeMeta = {
+      pv: {label: "PV-Anlage", icon: "PV"},
+      pv_battery: {label: "PV-Anlage mit Batterie", icon: "BAT"},
+      consumer: {label: "Verbraucher", icon: "LOAD"},
+      controllable_consumer: {label: "Steuerbarer Verbraucher", icon: "CTRL"},
+      grid: {label: "Netz", icon: "GRID"},
     };
 
     function setStatus(text, kind = "") {
       els.status.textContent = text;
       els.status.className = kind ? `status ${kind}` : "status";
+      showFooterStatus(text, kind);
     }
 
-    function createInputCell(value = "", placeholder = "") {
-      const td = document.createElement("td");
-      const input = document.createElement("input");
-      input.type = "text";
-      input.value = value || "";
-      input.placeholder = placeholder;
-      td.appendChild(input);
-      return {td, input};
+    function showFooterStatus(msg, kind = '') {
+      const el = document.getElementById('footerStatus');
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'footer-status' + (kind ? ` ${kind}` : '');
+      const timeEl = document.getElementById('footerTime');
+      if (timeEl && msg) timeEl.textContent = new Date().toLocaleTimeString('de-DE');
+      if (kind === 'ok' || kind === 'info') {
+        clearTimeout(el._timer);
+        el._timer = setTimeout(() => {
+          el.textContent = '';
+          el.className = 'footer-status';
+        }, 5000);
+      }
     }
 
-    function createSourceCell(value = "influx") {
-      const td = document.createElement("td");
-      const select = document.createElement("select");
-      const opt1 = document.createElement("option");
-      opt1.value = "influx";
-      opt1.textContent = "InfluxDB";
-      const opt2 = document.createElement("option");
-      opt2.value = "iobroker";
-      opt2.textContent = "ioBroker";
-      select.appendChild(opt1);
-      select.appendChild(opt2);
-      select.value = value || "influx";
-      td.appendChild(select);
-      return {td, select};
+    function uid(prefix) {
+      return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     }
 
-    function createRemoveCell(tbody, tr) {
-      const td = document.createElement("td");
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "remove-btn";
-      btn.textContent = "Entfernen";
-      btn.addEventListener("click", () => {
-        tbody.removeChild(tr);
+    function inferType(device) {
+      if (device.type) return device.type;
+      if (device.kind === "generator") return device.has_battery ? "pv_battery" : "pv";
+      if (device.kind === "consumer") return "consumer";
+      if (device.kind === "controllable") return "controllable_consumer";
+      if (device.kind === "grid") return "grid";
+      return "consumer";
+    }
+
+    function toUiDevices(cfg) {
+      const byId = {};
+      (cfg.generators || []).forEach((g, idx) => {
+        const id = g.id || `gen-${idx + 1}`;
+        byId[id] = {
+          id,
+          kind: "generator",
+          type: g.has_battery ? "pv_battery" : "pv",
+          name: g.name || "PV-Anlage",
+          state_key: g.state_key || "",
+          source: g.source || "influx",
+          power_state_key: g.power_state_key || "",
+          power_source: g.power_source || "iobroker",
+          has_battery: !!g.has_battery,
+          collapsed: false,
+        };
       });
-      td.appendChild(btn);
-      return td;
+      (cfg.consumers || []).forEach((c, idx) => {
+        const id = c.id || `consumer-${idx + 1}`;
+        byId[id] = {
+          id,
+          kind: "consumer",
+          type: "consumer",
+          name: c.name || "Verbraucher",
+          state_key: c.state_key || "",
+          source: c.source || "influx",
+          power_state_key: c.power_state_key || "",
+          power_source: c.power_source || "iobroker",
+          collapsed: false,
+        };
+      });
+      (cfg.controllable_consumers || []).forEach((c, idx) => {
+        const id = c.id || `ctrl-${idx + 1}`;
+        byId[id] = {
+          id,
+          kind: "controllable",
+          type: "controllable_consumer",
+          name: c.name || "Steuerbarer Verbraucher",
+          state_key: c.state_key || "",
+          control_key: c.control_key || "",
+          source: c.source || "influx",
+          power_state_key: c.power_state_key || "",
+          power_source: c.power_source || "iobroker",
+          collapsed: false,
+        };
+      });
+
+      const gridId = cfg.grid?.id || "grid-main";
+      byId[gridId] = {
+        id: gridId,
+        kind: "grid",
+        type: "grid",
+        name: "Netz",
+        import_state_key: cfg.grid?.import_state_key || "",
+        export_state_key: cfg.grid?.export_state_key || "",
+        import_source: cfg.grid?.import_source || "influx",
+        export_source: cfg.grid?.export_source || "influx",
+        import_power_state_key: cfg.grid?.import_power_state_key || "",
+        export_power_state_key: cfg.grid?.export_power_state_key || "",
+        import_power_source: cfg.grid?.import_power_source || "iobroker",
+        export_power_source: cfg.grid?.export_power_source || "iobroker",
+        collapsed: false,
+      };
+
+      const ids = cfg.device_order && cfg.device_order.length ? cfg.device_order : Object.keys(byId);
+      const devices = ids.filter(id => byId[id]).map(id => byId[id]);
+      Object.keys(byId).forEach(id => {
+        if (!devices.find(d => d.id === id)) devices.push(byId[id]);
+      });
+      return devices;
     }
 
-    function addConsumerRow(row = {name: "", state_key: "", source: "influx"}) {
-      const tr = document.createElement("tr");
-      const name = createInputCell(row.name, "z.B. Waschmaschine");
-      const state = createInputCell(row.state_key, "z.B. javascript.0.waschmaschine.energy");
-      const source = createSourceCell(row.source);
-      tr.appendChild(name.td);
-      tr.appendChild(state.td);
-      tr.appendChild(source.td);
-      tr.appendChild(createRemoveCell(els.consumersBody, tr));
-      els.consumersBody.appendChild(tr);
+    function buildPayload() {
+      const consumers = [];
+      const controllable_consumers = [];
+      const generators = [];
+
+      let gridDevice = appState.devices.find(d => inferType(d) === "grid");
+      if (!gridDevice) {
+        gridDevice = {
+          id: "grid-main",
+          import_state_key: "",
+          export_state_key: "",
+          import_source: "influx",
+          export_source: "influx",
+          import_power_state_key: "",
+          export_power_state_key: "",
+          import_power_source: "iobroker",
+          export_power_source: "iobroker",
+        };
+      }
+
+      appState.devices.forEach(d => {
+        const type = inferType(d);
+        if (type === "consumer") {
+          if (!(d.name || d.state_key || d.power_state_key)) return;
+          consumers.push({
+            id: d.id,
+            name: d.name || "Verbraucher",
+            state_key: d.state_key || "",
+            source: d.source || "influx",
+            power_state_key: d.power_state_key || "",
+            power_source: d.power_source || "iobroker",
+          });
+        }
+        if (type === "controllable_consumer") {
+          if (!(d.name || d.state_key || d.control_key || d.power_state_key)) return;
+          controllable_consumers.push({
+            id: d.id,
+            name: d.name || "Steuerbarer Verbraucher",
+            state_key: d.state_key || "",
+            control_key: d.control_key || "",
+            source: d.source || "influx",
+            power_state_key: d.power_state_key || "",
+            power_source: d.power_source || "iobroker",
+          });
+        }
+        if (type === "pv" || type === "pv_battery") {
+          if (!(d.name || d.state_key || d.power_state_key)) return;
+          generators.push({
+            id: d.id,
+            name: d.name || "PV-Anlage",
+            state_key: d.state_key || "",
+            has_battery: type === "pv_battery",
+            source: d.source || "influx",
+            power_state_key: d.power_state_key || "",
+            power_source: d.power_source || "iobroker",
+          });
+        }
+      });
+
+      return {
+        consumers,
+        controllable_consumers,
+        generators,
+        grid: {
+          id: gridDevice.id || "grid-main",
+          import_state_key: gridDevice.import_state_key || "",
+          export_state_key: gridDevice.export_state_key || "",
+          import_source: gridDevice.import_source || "influx",
+          export_source: gridDevice.export_source || "influx",
+          import_power_state_key: gridDevice.import_power_state_key || "",
+          export_power_state_key: gridDevice.export_power_state_key || "",
+          import_power_source: gridDevice.import_power_source || "iobroker",
+          export_power_source: gridDevice.export_power_source || "iobroker",
+        },
+        device_order: appState.devices.map(d => d.id),
+      };
     }
 
-    function addControllableRow(row = {name: "", state_key: "", control_key: "", source: "influx"}) {
-      const tr = document.createElement("tr");
-      const name = createInputCell(row.name, "z.B. Ochsner");
-      const state = createInputCell(row.state_key, "Messwert-Status");
-      const control = createInputCell(row.control_key, "Schalt-/Control-State");
-      const source = createSourceCell(row.source);
-      tr.appendChild(name.td);
-      tr.appendChild(state.td);
-      tr.appendChild(control.td);
-      tr.appendChild(source.td);
-      tr.appendChild(createRemoveCell(els.controllableBody, tr));
-      els.controllableBody.appendChild(tr);
+    function field(label, key, value, placeholder = "", sourceOptions = false) {
+      const wrap = document.createElement("div");
+      wrap.className = "field";
+
+      const labelEl = document.createElement("label");
+      labelEl.textContent = label;
+      wrap.appendChild(labelEl);
+
+      if (sourceOptions) {
+        const select = document.createElement("select");
+        ["influx", "iobroker"].forEach(v => {
+          const o = document.createElement("option");
+          o.value = v;
+          o.textContent = v === "iobroker" ? "ioBroker" : "InfluxDB";
+          select.appendChild(o);
+        });
+        select.value = value || "influx";
+        select.addEventListener("change", () => key.setter(select.value));
+        wrap.appendChild(select);
+      } else {
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = value || "";
+        input.placeholder = placeholder;
+        input.addEventListener("input", () => key.setter(input.value));
+        wrap.appendChild(input);
+      }
+
+      return wrap;
     }
 
-    function addGeneratorRow(row = {name: "", state_key: "", has_battery: false, source: "influx"}) {
-      const tr = document.createElement("tr");
-      const name = createInputCell(row.name, "z.B. PV mit Batterie");
-      const state = createInputCell(row.state_key, "Erzeuger-State");
-      const batteryTd = document.createElement("td");
-      const batteryInput = document.createElement("input");
-      batteryInput.type = "checkbox";
-      batteryInput.checked = !!row.has_battery;
-      batteryTd.appendChild(batteryInput);
-      const source = createSourceCell(row.source);
-      tr.appendChild(name.td);
-      tr.appendChild(state.td);
-      tr.appendChild(batteryTd);
-      tr.appendChild(source.td);
-      tr.appendChild(createRemoveCell(els.generatorsBody, tr));
-      els.generatorsBody.appendChild(tr);
+    function renderDeviceBody(device, body) {
+      body.innerHTML = "";
+      const grid = document.createElement("div");
+      grid.className = "field-grid";
+
+      const bind = (k) => ({ setter: (val) => { device[k] = val; renderDevices(); } });
+
+      if (inferType(device) === "grid") {
+        grid.appendChild(field("Bezug Energie (kWh)", bind("import_state_key"), device.import_state_key, "EMS.Grid.Energie.in"));
+        grid.appendChild(field("Bezug Quelle", bind("import_source"), device.import_source, "", true));
+        grid.appendChild(field("Bezug Leistung (W)", bind("import_power_state_key"), device.import_power_state_key, "EMS.Grid.Leistung.in"));
+        grid.appendChild(field("Bezug Leistung Quelle", bind("import_power_source"), device.import_power_source, "", true));
+        grid.appendChild(field("Einspeisung Energie (kWh)", bind("export_state_key"), device.export_state_key, "EMS.Grid.Energie.out"));
+        grid.appendChild(field("Einspeisung Quelle", bind("export_source"), device.export_source, "", true));
+        grid.appendChild(field("Einspeisung Leistung (W)", bind("export_power_state_key"), device.export_power_state_key, "EMS.Grid.Leistung.out"));
+        grid.appendChild(field("Einspeisung Leistung Quelle", bind("export_power_source"), device.export_power_source, "", true));
+      } else {
+        grid.appendChild(field("Name", bind("name"), device.name, "Geratename"));
+        grid.appendChild(field("Energie (kWh)", bind("state_key"), device.state_key, "State-Key Energie"));
+        grid.appendChild(field("Energie Quelle", bind("source"), device.source, "", true));
+        grid.appendChild(field("Leistung (W)", bind("power_state_key"), device.power_state_key, "State-Key Leistung"));
+        grid.appendChild(field("Leistung Quelle", bind("power_source"), device.power_source, "", true));
+
+        if (inferType(device) === "controllable_consumer") {
+          grid.appendChild(field("Control-Key", bind("control_key"), device.control_key, "Schalt- oder Regel-State"));
+        }
+
+        if (inferType(device) === "pv" || inferType(device) === "pv_battery") {
+          const checkWrap = document.createElement("div");
+          checkWrap.className = "checkline";
+          const check = document.createElement("input");
+          check.type = "checkbox";
+          check.checked = inferType(device) === "pv_battery";
+          check.addEventListener("change", () => {
+            device.type = check.checked ? "pv_battery" : "pv";
+            device.has_battery = check.checked;
+            renderDevices();
+          });
+          const text = document.createElement("span");
+          text.textContent = "Batterie vorhanden";
+          checkWrap.appendChild(check);
+          checkWrap.appendChild(text);
+          body.appendChild(checkWrap);
+        }
+      }
+
+      body.appendChild(grid);
     }
 
-    function rowsToObjects(tbody, mapper) {
-      return Array.from(tbody.querySelectorAll("tr"))
-        .map(tr => mapper(tr))
-        .filter(item => item.name || item.state_key || item.control_key);
+    function renderDevices() {
+      els.devices.innerHTML = "";
+
+      appState.devices.forEach(device => {
+        const card = document.createElement("article");
+        card.className = `device-card${device.collapsed ? " collapsed" : ""}`;
+        card.dataset.deviceId = device.id;
+
+        card.addEventListener("dragover", (ev) => {
+          ev.preventDefault();
+          card.classList.add("drop-target");
+        });
+        card.addEventListener("dragleave", () => card.classList.remove("drop-target"));
+        card.addEventListener("drop", (ev) => {
+          ev.preventDefault();
+          card.classList.remove("drop-target");
+          const targetId = card.dataset.deviceId;
+          moveDevice(appState.dragId, targetId);
+        });
+
+        const header = document.createElement("div");
+        header.className = "device-header";
+
+        const drag = document.createElement("span");
+        drag.className = "drag-handle";
+        drag.textContent = "::";
+        drag.draggable = true;
+        drag.addEventListener("dragstart", () => {
+          appState.dragId = device.id;
+          card.classList.add("dragging");
+        });
+        drag.addEventListener("dragend", () => {
+          appState.dragId = "";
+          card.classList.remove("dragging");
+          document.querySelectorAll(".drop-target").forEach(el => el.classList.remove("drop-target"));
+        });
+
+        const titleWrap = document.createElement("div");
+        titleWrap.className = "device-title-wrap";
+
+        const title = document.createElement("div");
+        title.className = "device-title";
+        title.textContent = device.name || typeMeta[inferType(device)].label;
+
+        const type = document.createElement("div");
+        type.className = "device-type";
+        type.textContent = `${typeMeta[inferType(device)].icon} ${typeMeta[inferType(device)].label}`;
+
+        titleWrap.appendChild(title);
+        titleWrap.appendChild(type);
+
+        const actions = document.createElement("div");
+        actions.className = "device-actions";
+
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "secondary";
+        toggle.textContent = device.collapsed ? "Aufklappen" : "Einklappen";
+        toggle.addEventListener("click", () => {
+          device.collapsed = !device.collapsed;
+          renderDevices();
+        });
+
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "remove-btn";
+        remove.textContent = "Entfernen";
+        remove.addEventListener("click", () => {
+          appState.devices = appState.devices.filter(d => d.id !== device.id);
+          renderDevices();
+        });
+        if (inferType(device) === "grid") {
+          remove.disabled = true;
+          remove.title = "Netz ist Pflicht";
+        }
+
+        actions.appendChild(toggle);
+        actions.appendChild(remove);
+
+        header.appendChild(drag);
+        header.appendChild(titleWrap);
+        header.appendChild(actions);
+
+        const body = document.createElement("div");
+        body.className = "device-body";
+        renderDeviceBody(device, body);
+
+        card.appendChild(header);
+        card.appendChild(body);
+        els.devices.appendChild(card);
+      });
+    }
+
+    function moveDevice(fromId, toId) {
+      if (!fromId || !toId || fromId === toId) return;
+      const fromIdx = appState.devices.findIndex(d => d.id === fromId);
+      const toIdx = appState.devices.findIndex(d => d.id === toId);
+      if (fromIdx < 0 || toIdx < 0) return;
+
+      const [moved] = appState.devices.splice(fromIdx, 1);
+      appState.devices.splice(toIdx, 0, moved);
+      renderDevices();
+    }
+
+    function addDevice(type) {
+      if (type === "grid" && appState.devices.some(d => inferType(d) === "grid")) {
+        setStatus("Es existiert bereits ein Netz-Gerat", "err");
+        return;
+      }
+
+      let device;
+      if (type === "pv" || type === "pv_battery") {
+        device = {
+          id: uid("gen"),
+          kind: "generator",
+          type,
+          name: type === "pv_battery" ? "PV mit Batterie" : "PV-Anlage",
+          state_key: "",
+          source: "influx",
+          power_state_key: "",
+          power_source: "iobroker",
+          has_battery: type === "pv_battery",
+          collapsed: false,
+        };
+      } else if (type === "controllable_consumer") {
+        device = {
+          id: uid("ctrl"),
+          kind: "controllable",
+          type,
+          name: "Steuerbarer Verbraucher",
+          state_key: "",
+          control_key: "",
+          source: "influx",
+          power_state_key: "",
+          power_source: "iobroker",
+          collapsed: false,
+        };
+      } else if (type === "grid") {
+        device = {
+          id: "grid-main",
+          kind: "grid",
+          type,
+          name: "Netz",
+          import_state_key: "",
+          export_state_key: "",
+          import_source: "influx",
+          export_source: "influx",
+          import_power_state_key: "",
+          export_power_state_key: "",
+          import_power_source: "iobroker",
+          export_power_source: "iobroker",
+          collapsed: false,
+        };
+      } else {
+        device = {
+          id: uid("consumer"),
+          kind: "consumer",
+          type: "consumer",
+          name: "Verbraucher",
+          state_key: "",
+          source: "influx",
+          power_state_key: "",
+          power_source: "iobroker",
+          collapsed: false,
+        };
+      }
+
+      appState.devices.push(device);
+      renderDevices();
+      setStatus("Neues Gerat angelegt", "ok");
     }
 
     async function loadConfig() {
@@ -426,55 +889,14 @@
       const res = await fetch("/api/config/datapoints");
       if (!res.ok) throw new Error("Konfiguration konnte nicht geladen werden");
       const cfg = await res.json();
-
-      els.consumersBody.innerHTML = "";
-      els.controllableBody.innerHTML = "";
-      els.generatorsBody.innerHTML = "";
-
-      (cfg.consumers || []).forEach(addConsumerRow);
-      (cfg.controllable_consumers || []).forEach(addControllableRow);
-      (cfg.generators || []).forEach(addGeneratorRow);
-
-      els.gridImport.value = cfg.grid?.import_state_key || "";
-      els.gridExport.value = cfg.grid?.export_state_key || "";
-      els.gridImportSource.value = cfg.grid?.import_source || "influx";
-      els.gridExportSource.value = cfg.grid?.export_source || "influx";
-
-      if (!cfg.consumers?.length) addConsumerRow();
-      if (!cfg.controllable_consumers?.length) addControllableRow();
-      if (!cfg.generators?.length) addGeneratorRow();
-
+      appState.devices = toUiDevices(cfg);
+      renderDevices();
       setStatus("Konfiguration geladen", "ok");
     }
 
     async function saveConfig() {
-      const payload = {
-        consumers: rowsToObjects(els.consumersBody, tr => ({
-          name: tr.children[0].querySelector("input").value.trim(),
-          state_key: tr.children[1].querySelector("input").value.trim(),
-          source: tr.children[2].querySelector("select").value,
-        })),
-        controllable_consumers: rowsToObjects(els.controllableBody, tr => ({
-          name: tr.children[0].querySelector("input").value.trim(),
-          state_key: tr.children[1].querySelector("input").value.trim(),
-          control_key: tr.children[2].querySelector("input").value.trim(),
-          source: tr.children[3].querySelector("select").value,
-        })),
-        generators: rowsToObjects(els.generatorsBody, tr => ({
-          name: tr.children[0].querySelector("input").value.trim(),
-          state_key: tr.children[1].querySelector("input").value.trim(),
-          has_battery: tr.children[2].querySelector("input").checked,
-          source: tr.children[3].querySelector("select").value,
-        })),
-        grid: {
-          import_state_key: els.gridImport.value.trim(),
-          export_state_key: els.gridExport.value.trim(),
-          import_source: els.gridImportSource.value,
-          export_source: els.gridExportSource.value,
-        },
-      };
-
       setStatus("Speichere...");
+      const payload = buildPayload();
       const res = await fetch("/api/config/datapoints", {
         method: "PUT",
         headers: {"Content-Type": "application/json"},
@@ -484,9 +906,8 @@
       setStatus("Konfiguration gespeichert", "ok");
     }
 
-    document.getElementById("addConsumer").addEventListener("click", () => addConsumerRow());
-    document.getElementById("addControllable").addEventListener("click", () => addControllableRow());
-    document.getElementById("addGenerator").addEventListener("click", () => addGeneratorRow());
+    els.addDeviceBtn.addEventListener("click", () => addDevice(els.newDeviceType.value));
+
     els.saveBtn.addEventListener("click", async () => {
       try {
         await saveConfig();
@@ -501,35 +922,34 @@
       setStatus("Laden fehlgeschlagen", "err");
     });
 
-    // ── update check ──────────────────────────────────────────────
     async function checkUpdate() {
       try {
-        const r = await fetch('/api/update/check');
+        const r = await fetch("/api/update/check");
         const d = await r.json();
         if (d.update_available) {
-          const btn = document.getElementById('updateBtn');
+          const btn = document.getElementById("updateBtn");
           if (btn) {
-            btn.textContent = `Update → v${d.latest} ↑`;
-            btn.style.display = 'inline-block';
+            btn.textContent = `Update -> v${d.latest} ↑`;
+            btn.style.display = "inline-block";
           }
         }
       } catch (_) {}
     }
 
     async function applyUpdate() {
-      const btn = document.getElementById('updateBtn');
-      if (btn) { btn.textContent = 'Aktualisiere…'; btn.disabled = true; }
+      const btn = document.getElementById("updateBtn");
+      if (btn) { btn.textContent = "Aktualisiere..."; btn.disabled = true; }
       try {
-        const r = await fetch('/api/update/apply', { method: 'POST' });
+        const r = await fetch("/api/update/apply", { method: "POST" });
         const d = await r.json();
-        if (d.status === 'ok') {
-          alert('Update erfolgreich. Server wird neu gestartet…');
+        if (d.status === "ok") {
+          alert("Update erfolgreich. Server wird neu gestartet...");
         } else {
-          alert('Fehler beim Update:\n' + (d.output || d.error));
+          alert("Fehler beim Update:\n" + (d.output || d.error));
           if (btn) { btn.disabled = false; }
         }
       } catch (e) {
-        alert('Update fehlgeschlagen: ' + e);
+        alert("Update fehlgeschlagen: " + e);
         if (btn) { btn.disabled = false; }
       }
     }

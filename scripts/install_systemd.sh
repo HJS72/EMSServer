@@ -20,6 +20,13 @@ fi
 "${SUDO[@]}" sed -i "s|__USER__|$USER|g" "$SERVICE_FILE"
 "${SUDO[@]}" sed -i "s|__APP_USER__|$USER|g" "$UPDATER_SERVICE_FILE"
 
+# Keep runtime data outside the repo so updates/builds cannot wipe it.
+"${SUDO[@]}" mkdir -p /var/lib/ems-server
+if [[ -d "$ROOT_DIR/data" ]]; then
+	"${SUDO[@]}" cp -a "$ROOT_DIR/data/." /var/lib/ems-server/ || true
+fi
+"${SUDO[@]}" chown -R "$USER":"$USER" /var/lib/ems-server
+
 "${SUDO[@]}" systemctl daemon-reload
 "${SUDO[@]}" systemctl enable --now ems-server.service
 "${SUDO[@]}" systemctl enable --now ems-updater.timer
