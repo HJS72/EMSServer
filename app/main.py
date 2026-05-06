@@ -114,6 +114,45 @@ async def put_datapoint_config(payload: DataPointConfig) -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
 
+@app.get("/api/livedata/all")
+async def livedata_all() -> JSONResponse:
+    config = config_service.load()
+    result = {
+        "consumers": [],
+        "controllable_consumers": [],
+        "generators": [],
+        "grid": {"import_value": None, "export_value": None},
+    }
+
+    async def get_value(state_key: str, source: str) -> float | None:
+        if not state_key:
+            return None
+        try:
+            if source == "iobroker":
+                return await iobroker.get_state_value(state_key)
+            else:
+                return await influx.get_latest_value(state_key)
+        except Exception:
+            return None
+
+    for consumer in config.consumers:
+        val = await get_value(consumer.state_key, consumer.source)
+        result["consumers"].append({"name": consumer.name, "state_key": consumer.state_key, "source": consumer.source, "value_kwh": val})
+
+    for cc in config.controllable_consumers:
+        val = await get_value(cc.state_key, cc.source)
+        result["controllable_consumers"].append({"name": cc.name, "state_key": cc.state_key, "source": cc.source, "value_kwh": val})
+
+    for gen in config.generators:
+        val = await get_value(gen.state_key, gen.source)
+        result["generators"].append({"name": gen.name, "state_key": gen.state_key, "has_battery": gen.has_battery, "source": gen.source, "value_kwh": val})
+
+    result["grid"]["import_value"] = await get_value(config.grid.import_state_key, config.grid.import_source)
+    result["grid"]["export_value"] = await get_value(config.grid.export_state_key, config.grid.export_source)
+
+    return JSONResponse(result)
+
+
 @app.get("/api/update/check")
 async def update_check() -> JSONResponse:
     try:

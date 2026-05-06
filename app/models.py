@@ -38,23 +38,28 @@ class CompareResponse(BaseModel):
 class ConfigConsumer(BaseModel):
     name: str
     state_key: str
+    source: str = "influx"  # "influx" oder "iobroker"
 
 
 class ConfigControllableConsumer(BaseModel):
     name: str
     state_key: str
     control_key: str = ""
+    source: str = "influx"  # "influx" oder "iobroker"
 
 
 class ConfigGenerator(BaseModel):
     name: str
     state_key: str
     has_battery: bool = False
+    source: str = "influx"  # "influx" oder "iobroker"
 
 
 class ConfigGrid(BaseModel):
     import_state_key: str = "EMS.Grid.Energie.in"
     export_state_key: str = "EMS.Grid.Energie.out"
+    import_source: str = "influx"  # "influx" oder "iobroker"
+    export_source: str = "influx"  # "influx" oder "iobroker"
 
 
 class DataPointConfig(BaseModel):

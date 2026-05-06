@@ -175,6 +175,16 @@
       font-size: 0.9rem;
     }
 
+    select {
+      width: 100%;
+      border: 1px solid #2b465f;
+      background: #0a1622;
+      color: #ebf4fb;
+      border-radius: 8px;
+      padding: 0.45rem 0.55rem;
+      font-size: 0.9rem;
+    }
+
     input[type="checkbox"] {
       transform: scale(1.1);
     }
@@ -253,7 +263,7 @@
       <article class="card">
         <h2>Reine Verbraucher</h2>
         <table>
-          <thead><tr><th>Name</th><th>State-Key</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>State-Key</th><th>Quelle</th><th></th></tr></thead>
           <tbody id="consumersBody"></tbody>
         </table>
         <div class="row-actions"><button class="secondary" id="addConsumer">+ Verbraucher</button></div>
@@ -262,7 +272,7 @@
       <article class="card">
         <h2>Steuerbare Verbraucher</h2>
         <table>
-          <thead><tr><th>Name</th><th>State-Key</th><th>Control-Key</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>State-Key</th><th>Control-Key</th><th>Quelle</th><th></th></tr></thead>
           <tbody id="controllableBody"></tbody>
         </table>
         <div class="row-actions"><button class="secondary" id="addControllable">+ Steuerbarer Verbraucher</button></div>
@@ -271,7 +281,7 @@
       <article class="card full">
         <h2>Erzeuger</h2>
         <table>
-          <thead><tr><th>Name</th><th>State-Key</th><th>Batterie</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>State-Key</th><th>Batterie</th><th>Quelle</th><th></th></tr></thead>
           <tbody id="generatorsBody"></tbody>
         </table>
         <div class="row-actions"><button class="secondary" id="addGenerator">+ Erzeuger</button></div>
@@ -284,10 +294,12 @@
             <tr>
               <th>Bezug (Import)</th>
               <td><input id="gridImport" type="text" placeholder="EMS.Grid.Energie.in"></td>
+              <td><select id="gridImportSource"><option value="influx">InfluxDB</option><option value="iobroker">ioBroker</option></select></td>
             </tr>
             <tr>
               <th>Einspeisung (Export)</th>
               <td><input id="gridExport" type="text" placeholder="EMS.Grid.Energie.out"></td>
+              <td><select id="gridExportSource"><option value="influx">InfluxDB</option><option value="iobroker">ioBroker</option></select></td>
             </tr>
           </tbody>
         </table>
@@ -309,6 +321,8 @@
       generatorsBody: document.getElementById("generatorsBody"),
       gridImport: document.getElementById("gridImport"),
       gridExport: document.getElementById("gridExport"),
+      gridImportSource: document.getElementById("gridImportSource"),
+      gridExportSource: document.getElementById("gridExportSource"),
       status: document.getElementById("status"),
       saveBtn: document.getElementById("saveBtn"),
     };
@@ -328,6 +342,22 @@
       return {td, input};
     }
 
+    function createSourceCell(value = "influx") {
+      const td = document.createElement("td");
+      const select = document.createElement("select");
+      const opt1 = document.createElement("option");
+      opt1.value = "influx";
+      opt1.textContent = "InfluxDB";
+      const opt2 = document.createElement("option");
+      opt2.value = "iobroker";
+      opt2.textContent = "ioBroker";
+      select.appendChild(opt1);
+      select.appendChild(opt2);
+      select.value = value || "influx";
+      td.appendChild(select);
+      return {td, select};
+    }
+
     function createRemoveCell(tbody, tr) {
       const td = document.createElement("td");
       const btn = document.createElement("button");
@@ -341,29 +371,33 @@
       return td;
     }
 
-    function addConsumerRow(row = {name: "", state_key: ""}) {
+    function addConsumerRow(row = {name: "", state_key: "", source: "influx"}) {
       const tr = document.createElement("tr");
       const name = createInputCell(row.name, "z.B. Waschmaschine");
       const state = createInputCell(row.state_key, "z.B. javascript.0.waschmaschine.energy");
+      const source = createSourceCell(row.source);
       tr.appendChild(name.td);
       tr.appendChild(state.td);
+      tr.appendChild(source.td);
       tr.appendChild(createRemoveCell(els.consumersBody, tr));
       els.consumersBody.appendChild(tr);
     }
 
-    function addControllableRow(row = {name: "", state_key: "", control_key: ""}) {
+    function addControllableRow(row = {name: "", state_key: "", control_key: "", source: "influx"}) {
       const tr = document.createElement("tr");
       const name = createInputCell(row.name, "z.B. Ochsner");
       const state = createInputCell(row.state_key, "Messwert-Status");
       const control = createInputCell(row.control_key, "Schalt-/Control-State");
+      const source = createSourceCell(row.source);
       tr.appendChild(name.td);
       tr.appendChild(state.td);
       tr.appendChild(control.td);
+      tr.appendChild(source.td);
       tr.appendChild(createRemoveCell(els.controllableBody, tr));
       els.controllableBody.appendChild(tr);
     }
 
-    function addGeneratorRow(row = {name: "", state_key: "", has_battery: false}) {
+    function addGeneratorRow(row = {name: "", state_key: "", has_battery: false, source: "influx"}) {
       const tr = document.createElement("tr");
       const name = createInputCell(row.name, "z.B. PV mit Batterie");
       const state = createInputCell(row.state_key, "Erzeuger-State");
@@ -372,9 +406,11 @@
       batteryInput.type = "checkbox";
       batteryInput.checked = !!row.has_battery;
       batteryTd.appendChild(batteryInput);
+      const source = createSourceCell(row.source);
       tr.appendChild(name.td);
       tr.appendChild(state.td);
       tr.appendChild(batteryTd);
+      tr.appendChild(source.td);
       tr.appendChild(createRemoveCell(els.generatorsBody, tr));
       els.generatorsBody.appendChild(tr);
     }
@@ -401,6 +437,8 @@
 
       els.gridImport.value = cfg.grid?.import_state_key || "";
       els.gridExport.value = cfg.grid?.export_state_key || "";
+      els.gridImportSource.value = cfg.grid?.import_source || "influx";
+      els.gridExportSource.value = cfg.grid?.export_source || "influx";
 
       if (!cfg.consumers?.length) addConsumerRow();
       if (!cfg.controllable_consumers?.length) addControllableRow();
@@ -414,20 +452,25 @@
         consumers: rowsToObjects(els.consumersBody, tr => ({
           name: tr.children[0].querySelector("input").value.trim(),
           state_key: tr.children[1].querySelector("input").value.trim(),
+          source: tr.children[2].querySelector("select").value,
         })),
         controllable_consumers: rowsToObjects(els.controllableBody, tr => ({
           name: tr.children[0].querySelector("input").value.trim(),
           state_key: tr.children[1].querySelector("input").value.trim(),
           control_key: tr.children[2].querySelector("input").value.trim(),
+          source: tr.children[3].querySelector("select").value,
         })),
         generators: rowsToObjects(els.generatorsBody, tr => ({
           name: tr.children[0].querySelector("input").value.trim(),
           state_key: tr.children[1].querySelector("input").value.trim(),
           has_battery: tr.children[2].querySelector("input").checked,
+          source: tr.children[3].querySelector("select").value,
         })),
         grid: {
           import_state_key: els.gridImport.value.trim(),
           export_state_key: els.gridExport.value.trim(),
+          import_source: els.gridImportSource.value,
+          export_source: els.gridExportSource.value,
         },
       };
 
