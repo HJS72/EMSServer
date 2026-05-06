@@ -181,8 +181,20 @@ async def livedata_all() -> JSONResponse:
 
     result["grid"]["import_value"] = await get_value(config.grid.import_state_key, config.grid.import_source)
     result["grid"]["export_value"] = await get_value(config.grid.export_state_key, config.grid.export_source)
-    result["grid"]["import_power"] = await get_value(config.grid.import_power_state_key, config.grid.import_power_source)
-    result["grid"]["export_power"] = await get_value(config.grid.export_power_state_key, config.grid.export_power_source)
+    raw_power = await get_value(config.grid.power_state_key, config.grid.power_source)
+    if raw_power is None:
+        import_power_w = None
+        export_power_w = None
+    elif config.grid.power_sign == "export_positive":
+        # positiv = Einspeisung, negativ = Bezug
+        export_power_w = max(0.0, float(raw_power))
+        import_power_w = max(0.0, -float(raw_power))
+    else:
+        # "import_positive": positiv = Bezug, negativ = Einspeisung (default)
+        import_power_w = max(0.0, float(raw_power))
+        export_power_w = max(0.0, -float(raw_power))
+    result["grid"]["import_power"] = import_power_w
+    result["grid"]["export_power"] = export_power_w
 
     id_to_device = {}
     for item in result["generators"]:

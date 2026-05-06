@@ -538,10 +538,9 @@
         export_state_key: cfg.grid?.export_state_key || "",
         import_source: cfg.grid?.import_source || "influx",
         export_source: cfg.grid?.export_source || "influx",
-        import_power_state_key: cfg.grid?.import_power_state_key || "",
-        export_power_state_key: cfg.grid?.export_power_state_key || "",
-        import_power_source: cfg.grid?.import_power_source || "iobroker",
-        export_power_source: cfg.grid?.export_power_source || "iobroker",
+          power_state_key: cfg.grid?.power_state_key || "",
+          power_source: cfg.grid?.power_source || "iobroker",
+          power_sign: cfg.grid?.power_sign || "import_positive",
         collapsed: false,
       };
 
@@ -566,10 +565,9 @@
           export_state_key: "",
           import_source: "influx",
           export_source: "influx",
-          import_power_state_key: "",
-          export_power_state_key: "",
-          import_power_source: "iobroker",
-          export_power_source: "iobroker",
+            power_state_key: "",
+            power_source: "iobroker",
+            power_sign: "import_positive",
         };
       }
 
@@ -622,10 +620,9 @@
           export_state_key: gridDevice.export_state_key || "",
           import_source: gridDevice.import_source || "influx",
           export_source: gridDevice.export_source || "influx",
-          import_power_state_key: gridDevice.import_power_state_key || "",
-          export_power_state_key: gridDevice.export_power_state_key || "",
-          import_power_source: gridDevice.import_power_source || "iobroker",
-          export_power_source: gridDevice.export_power_source || "iobroker",
+           power_state_key: gridDevice.power_state_key || "",
+           power_source: gridDevice.power_source || "iobroker",
+           power_sign: gridDevice.power_sign || "import_positive",
         },
         device_order: appState.devices.map(d => d.id),
       };
@@ -686,13 +683,25 @@
       if (inferType(device) === "grid") {
         grid.appendChild(field("Bezug Energie (kWh)", bind("import_state_key"), device.import_state_key, "EMS.Grid.Energie.in"));
         grid.appendChild(field("Bezug Quelle", bindSrc("import_source"), device.import_source, "", true));
-        grid.appendChild(field("Bezug Leistung (W)", bind("import_power_state_key"), device.import_power_state_key, "EMS.Grid.Leistung.in"));
-        grid.appendChild(field("Bezug Leistung Quelle", bindSrc("import_power_source"), device.import_power_source, "", true));
         grid.appendChild(field("Einspeisung Energie (kWh)", bind("export_state_key"), device.export_state_key, "EMS.Grid.Energie.out"));
         grid.appendChild(field("Einspeisung Quelle", bindSrc("export_source"), device.export_source, "", true));
-        grid.appendChild(field("Einspeisung Leistung (W)", bind("export_power_state_key"), device.export_power_state_key, "EMS.Grid.Leistung.out"));
-        grid.appendChild(field("Einspeisung Leistung Quelle", bindSrc("export_power_source"), device.export_power_source, "", true));
-      } else {
+          grid.appendChild(field("Leistung (W)", bind("power_state_key"), device.power_state_key, "EMS.Grid.Leistung", false, true));
+          grid.appendChild(field("Leistung Quelle", bindSrc("power_source"), device.power_source, "", true));
+        // power sign convention select
+        const signWrap = document.createElement("div");
+        signWrap.className = "field field-full";
+        const signLabel = document.createElement("label");
+        signLabel.textContent = "Vorzeichen Leistung";
+        const signSelect = document.createElement("select");
+        [["import_positive", "Bezug positiv (Einspeisung negativ)"], ["export_positive", "Einspeisung positiv (Bezug negativ)"]].forEach(([v, t]) => {
+          const o = document.createElement("option"); o.value = v; o.textContent = t; signSelect.appendChild(o);
+        });
+        signSelect.value = device.power_sign || "import_positive";
+        signSelect.addEventListener("change", () => { device.power_sign = signSelect.value; renderDevices(); });
+        signWrap.appendChild(signLabel);
+        signWrap.appendChild(signSelect);
+        grid.appendChild(signWrap);
+        } else {
         grid.appendChild(field("Name", bind("name"), device.name, "Gerätename", false, true));
         grid.appendChild(field("Energie (kWh)", bind("state_key"), device.state_key, "State-Key Energie"));
         grid.appendChild(field("Energie Quelle", bindSrc("source"), device.source, "", true));
@@ -856,10 +865,9 @@
           export_state_key: "",
           import_source: "influx",
           export_source: "influx",
-          import_power_state_key: "",
-          export_power_state_key: "",
-          import_power_source: "iobroker",
-          export_power_source: "iobroker",
+            power_state_key: "",
+            power_source: "iobroker",
+            power_sign: "import_positive",
           collapsed: false,
         };
       } else {

@@ -68,12 +68,13 @@ class ConfigGrid(BaseModel):
     id: str = "grid-main"
     import_state_key: str = "EMS.Grid.Energie.in"
     export_state_key: str = "EMS.Grid.Energie.out"
-    import_power_state_key: str = ""  # Aktuelle Leistung Import (W)
-    export_power_state_key: str = ""  # Aktuelle Leistung Export (W)
-    import_source: str = "influx"  # "influx" oder "iobroker" für Energie
-    export_source: str = "influx"  # "influx" oder "iobroker" für Energie
-    import_power_source: str = "iobroker"  # Leistung kommt typischerweise von ioBroker
-    export_power_source: str = "iobroker"  # Leistung kommt typischerweise von ioBroker
+    power_state_key: str = ""   # Einzelner Leistungs-Datenpunkt (W), Vorzeichen per power_sign
+    # "import_positive": positiv = Bezug, negativ = Einspeisung
+    # "export_positive": positiv = Einspeisung, negativ = Bezug
+    power_sign: str = "import_positive"
+    import_source: str = "influx"
+    export_source: str = "influx"
+    power_source: str = "iobroker"
 
 
 class DataPointConfig(BaseModel):
