@@ -66,6 +66,19 @@ if [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]; then
   exit 0
 fi
 
+DATAPOINT_CONFIG_REL="data/datapoint_config.json"
+DATAPOINT_CONFIG_PATH="$ROOT_DIR/$DATAPOINT_CONFIG_REL"
+DATAPOINT_CONFIG_BACKUP="/tmp/ems-datapoint-config.$$.json"
+
+if [[ -f "$DATAPOINT_CONFIG_PATH" ]]; then
+  cp "$DATAPOINT_CONFIG_PATH" "$DATAPOINT_CONFIG_BACKUP" || true
+fi
+
+# Runtime files under data/ are frequently modified on productive systems and can
+# block fast-forward pulls. Reset only volatile files before pulling updates.
+run_as_app "git checkout -- data/latest_forecast.json data/archive '$DATAPOINT_CONFIG_REL' 2>/dev/null || true"
+run_as_app "git clean -f -- data/archive 2>/dev/null || true"
+
 # If this script was copied manually to the server, its local modification would
 # block the fast-forward pull that should update it. Reset only this file before
 # pulling; other local changes remain untouched and still fail loudly.
@@ -76,6 +89,14 @@ fi
 
 run_as_app "git pull --ff-only origin '$BRANCH'"
 run_as_app "'$ROOT_DIR/.venv/bin/pip' install -r requirements.txt"
+
+if [[ -f "$DATAPOINT_CONFIG_BACKUP" ]]; then
+  cp "$DATAPOINT_CONFIG_BACKUP" "$DATAPOINT_CONFIG_PATH" || true
+  if [[ -n "$APP_USER" ]]; then
+    chown "$APP_USER":"$APP_USER" "$DATAPOINT_CONFIG_PATH" >/dev/null 2>&1 || true
+  fi
+  rm -f "$DATAPOINT_CONFIG_BACKUP"
+fi
 
 SERVICE_NAME="${SERVICE_NAME:-ems-server}"
 
