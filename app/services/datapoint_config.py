@@ -32,7 +32,13 @@ class DataPointConfigService:
                 ConfigControllableConsumer(id="ctrl-2", name="Klima", state_key="", control_key=""),
             ],
             generators=[
-                ConfigGenerator(id="gen-1", name="Hoymiles", state_key="EMS.Hoymiles.Energie", has_battery=False),
+                ConfigGenerator(
+                    id="gen-1",
+                    name="Hoymiles",
+                    state_key="EMS.Hoymiles.Energie",
+                    has_battery=False,
+                    forecast_enabled=False,
+                ),
                 ConfigGenerator(
                     id="gen-2",
                     name="SolarEdge Hybrid",
@@ -44,6 +50,7 @@ class DataPointConfigService:
                     battery_capacity_wh_state_key="modbus.0.holdingRegisters.102787_Batt_Rated_Energy",
                     battery_rest_soc_percent=10.0,
                     battery_capacity_kwh=10.0,
+                    forecast_enabled=False,
                 ),
             ],
             grid=ConfigGrid(
@@ -67,6 +74,20 @@ class DataPointConfigService:
         ensure_ids(config.generators, "gen")
         ensure_ids(config.consumers, "consumer")
         ensure_ids(config.controllable_consumers, "ctrl")
+
+        for gen in config.generators:
+            has_forecast_params = any(
+                value is not None
+                for value in (
+                    gen.forecast_lat,
+                    gen.forecast_lon,
+                    gen.forecast_kwp,
+                    gen.forecast_azimuth,
+                    gen.forecast_declination,
+                )
+            )
+            if gen.forecast_enabled and not has_forecast_params:
+                gen.forecast_enabled = False
 
         if not config.grid.id:
             config.grid.id = "grid-main"

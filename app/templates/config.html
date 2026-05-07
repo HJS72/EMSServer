@@ -485,6 +485,13 @@
       const byId = {};
       (cfg.generators || []).forEach((g, idx) => {
         const id = g.id || `gen-${idx + 1}`;
+        const hasForecastParams = [
+          g.forecast_lat,
+          g.forecast_lon,
+          g.forecast_kwp,
+          g.forecast_azimuth,
+          g.forecast_declination,
+        ].some(v => v !== null && v !== undefined && String(v).trim() !== "");
         byId[id] = {
           id,
           kind: "generator",
@@ -504,6 +511,12 @@
           battery_power_sign: g.battery_power_sign || "charge_positive",
           battery_rest_soc_percent: g.battery_rest_soc_percent !== null && g.battery_rest_soc_percent !== undefined ? String(g.battery_rest_soc_percent) : "",
           battery_capacity_kwh: g.battery_capacity_kwh !== null && g.battery_capacity_kwh !== undefined ? String(g.battery_capacity_kwh) : "",
+          forecast_enabled: g.forecast_enabled !== false && hasForecastParams,
+          forecast_lat: g.forecast_lat !== null && g.forecast_lat !== undefined ? String(g.forecast_lat) : "",
+          forecast_lon: g.forecast_lon !== null && g.forecast_lon !== undefined ? String(g.forecast_lon) : "",
+          forecast_kwp: g.forecast_kwp !== null && g.forecast_kwp !== undefined ? String(g.forecast_kwp) : "",
+          forecast_azimuth: g.forecast_azimuth !== null && g.forecast_azimuth !== undefined ? String(g.forecast_azimuth) : "",
+          forecast_declination: g.forecast_declination !== null && g.forecast_declination !== undefined ? String(g.forecast_declination) : "",
           has_battery: !!g.has_battery,
           collapsed: false,
         };
@@ -566,6 +579,13 @@
       const consumers = [];
       const controllable_consumers = [];
       const generators = [];
+      const toNullableNumber = (value) => {
+        if (value === null || value === undefined) return null;
+        const text = String(value).trim();
+        if (!text) return null;
+        const parsed = Number(text);
+        return Number.isFinite(parsed) ? parsed : null;
+      };
 
       let gridDevice = appState.devices.find(d => inferType(d) === "grid");
       if (!gridDevice) {
@@ -607,7 +627,7 @@
           });
         }
         if (type === "pv" || type === "pv_battery") {
-          if (!(d.name || d.state_key || d.power_state_key || d.pv_power_state_key || d.battery_soc_state_key || d.battery_power_state_key || d.battery_capacity_wh_state_key || d.battery_rest_soc_percent)) return;
+          if (!(d.name || d.state_key || d.power_state_key || d.pv_power_state_key || d.battery_soc_state_key || d.battery_power_state_key || d.battery_capacity_wh_state_key || d.battery_rest_soc_percent || d.forecast_lat || d.forecast_lon || d.forecast_kwp)) return;
           generators.push({
             id: d.id,
             name: d.name || "PV-Anlage",
@@ -626,6 +646,12 @@
             battery_power_sign: d.battery_power_sign || "charge_positive",
             battery_rest_soc_percent: Number(d.battery_rest_soc_percent || 0),
             battery_capacity_kwh: Number(d.battery_capacity_kwh || 0),
+            forecast_enabled: d.forecast_enabled !== false,
+            forecast_lat: toNullableNumber(d.forecast_lat),
+            forecast_lon: toNullableNumber(d.forecast_lon),
+            forecast_kwp: toNullableNumber(d.forecast_kwp),
+            forecast_azimuth: toNullableNumber(d.forecast_azimuth),
+            forecast_declination: toNullableNumber(d.forecast_declination),
           });
         }
       });
@@ -742,6 +768,34 @@
         grid.appendChild(field("Energie Quelle", bindSrc("source"), device.source, "", true, false, "energy"));
         grid.appendChild(field("Leistung (W)", bind("power_state_key"), device.power_state_key, "State-Key Leistung"));
         grid.appendChild(field("Leistung Quelle", bindSrc("power_source"), device.power_source, "", true));
+
+        if (inferType(device) === "pv" || inferType(device) === "pv_battery") {
+          const forecastWrap = document.createElement("div");
+          forecastWrap.className = "field field-full";
+          const forecastLabel = document.createElement("label");
+          forecastLabel.textContent = "Forecast aktiv";
+          const forecastLine = document.createElement("div");
+          forecastLine.className = "checkline";
+          const forecastCheck = document.createElement("input");
+          forecastCheck.type = "checkbox";
+          forecastCheck.checked = device.forecast_enabled !== false;
+          forecastCheck.addEventListener("change", () => {
+            device.forecast_enabled = forecastCheck.checked;
+          });
+          const forecastText = document.createElement("span");
+          forecastText.textContent = "Anlage in PV-Prognose einbeziehen";
+          forecastLine.appendChild(forecastCheck);
+          forecastLine.appendChild(forecastText);
+          forecastWrap.appendChild(forecastLabel);
+          forecastWrap.appendChild(forecastLine);
+          grid.appendChild(forecastWrap);
+
+          grid.appendChild(field("Forecast Latitude", bind("forecast_lat"), device.forecast_lat, "z.B. 48.137"));
+          grid.appendChild(field("Forecast Longitude", bind("forecast_lon"), device.forecast_lon, "z.B. 11.575"));
+          grid.appendChild(field("Forecast kWp", bind("forecast_kwp"), device.forecast_kwp, "z.B. 10.0"));
+          grid.appendChild(field("Forecast Azimut", bind("forecast_azimuth"), device.forecast_azimuth, "z.B. 180"));
+          grid.appendChild(field("Forecast Neigung", bind("forecast_declination"), device.forecast_declination, "z.B. 35"));
+        }
 
         if (inferType(device) === "pv_battery") {
           grid.appendChild(field("PV-Leistung (W)", bind("pv_power_state_key"), device.pv_power_state_key, "State-Key PV-Leistung"));
@@ -915,6 +969,12 @@
           battery_power_sign: "charge_positive",
           battery_rest_soc_percent: "10",
           battery_capacity_kwh: "10.0",
+          forecast_enabled: false,
+          forecast_lat: "",
+          forecast_lon: "",
+          forecast_kwp: "",
+          forecast_azimuth: "",
+          forecast_declination: "",
           has_battery: type === "pv_battery",
           collapsed: false,
         };
@@ -976,6 +1036,32 @@
     }
 
     async function saveConfig() {
+      const missing = [];
+      appState.devices.forEach(d => {
+        const type = inferType(d);
+        if (!(type === "pv" || type === "pv_battery")) return;
+        if (d.forecast_enabled === false) return;
+
+        const checks = [
+          ["forecast_lat", "Latitude"],
+          ["forecast_lon", "Longitude"],
+          ["forecast_kwp", "kWp"],
+          ["forecast_azimuth", "Azimut"],
+          ["forecast_declination", "Neigung"],
+        ];
+
+        checks.forEach(([key, label]) => {
+          const raw = d[key];
+          if (raw === null || raw === undefined || String(raw).trim() === "") {
+            missing.push(`${d.name || d.id}: ${label}`);
+          }
+        });
+      });
+
+      if (missing.length) {
+        throw new Error(`Pflichtfelder fur Forecast fehlen: ${missing.join(", ")}`);
+      }
+
       setStatus("Speichere...");
       const payload = buildPayload();
       const res = await fetch("/api/config/datapoints", {
@@ -983,7 +1069,19 @@
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Speichern fehlgeschlagen");
+      if (!res.ok) {
+        let message = "Speichern fehlgeschlagen";
+        try {
+          const err = await res.json();
+          if (err?.detail?.message) {
+            message = err.detail.message;
+            if (Array.isArray(err.detail.missing) && err.detail.missing.length) {
+              message += `: ${err.detail.missing.join(", ")}`;
+            }
+          }
+        } catch (_) {}
+        throw new Error(message);
+      }
       setStatus("Konfiguration gespeichert", "ok");
     }
 

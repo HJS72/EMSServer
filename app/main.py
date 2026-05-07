@@ -9,6 +9,7 @@ from pathlib import Path
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Query, Request
+from fastapi import HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -31,9 +32,9 @@ GITHUB_REPO = "HJS72/EMSServer"
 
 influx = InfluxSource(settings)
 iobroker = IoBrokerSource(settings)
-pv_service = PvForecastService(settings)
-storage = Storage(settings.data_dir)
 config_service = DataPointConfigService(settings.data_dir)
+pv_service = PvForecastService(settings, config_service)
+storage = Storage(settings.data_dir)
 engine = ForecastEngine(settings, influx, iobroker, pv_service, storage)
 scheduler = AsyncIOScheduler(timezone=settings.timezone)
 
@@ -125,6 +126,31 @@ async def get_datapoint_config() -> JSONResponse:
 
 @app.put("/api/config/datapoints")
 async def put_datapoint_config(payload: DataPointConfig) -> JSONResponse:
+    missing: list[str] = []
+    required_forecast_fields = [
+        ("forecast_lat", "Latitude"),
+        ("forecast_lon", "Longitude"),
+        ("forecast_kwp", "kWp"),
+        ("forecast_azimuth", "Azimut"),
+        ("forecast_declination", "Neigung"),
+    ]
+    for gen in payload.generators:
+        if not gen.forecast_enabled:
+            continue
+        for field_name, label in required_forecast_fields:
+            value = getattr(gen, field_name, None)
+            if value is None:
+                missing.append(f"{gen.name or gen.id}: {label}")
+
+    if missing:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Pflichtfelder fur Forecast fehlen",
+                "missing": missing,
+            },
+        )
+
     config_service.save(payload)
     return JSONResponse({"status": "ok"})
 

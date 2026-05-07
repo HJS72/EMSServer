@@ -78,6 +78,13 @@ class ConfigGenerator(BaseModel):
     battery_rest_soc_percent: float = 0.0
     # Installed battery capacity for ETA calculation.
     battery_capacity_kwh: float = 0.0
+    # Per-installation forecast parameters for forecast.solar.
+    forecast_enabled: bool = False
+    forecast_lat: float | None = None
+    forecast_lon: float | None = None
+    forecast_kwp: float | None = None
+    forecast_azimuth: float | None = None
+    forecast_declination: float | None = None
 
 
 class ConfigGrid(BaseModel):
