@@ -3,6 +3,21 @@ set -e
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
+ensure_safe_directory() {
+  local target_user="$1"
+  local config_cmd="git config --global --add safe.directory '$ROOT_DIR'"
+
+  if [[ -z "$target_user" ]]; then
+    return 0
+  fi
+
+  if [[ "$(id -u)" -eq 0 ]]; then
+    su - "$target_user" -s /bin/bash -c "$config_cmd" >/dev/null 2>&1 || true
+  elif [[ "$target_user" == "$(id -un)" ]]; then
+    bash -lc "$config_cmd" >/dev/null 2>&1 || true
+  fi
+}
+
 run_as_app() {
   local command="$1"
 
@@ -24,6 +39,11 @@ APP_USER="${APP_USER:-$(stat -c '%U' "$ROOT_DIR")}"
 
 cd "$ROOT_DIR"
 
+ensure_safe_directory "$APP_USER"
+if [[ "$(id -u)" -eq 0 ]]; then
+  git config --global --add safe.directory "$ROOT_DIR" >/dev/null 2>&1 || true
+fi
+
 if [[ ! -d .git ]]; then
   echo "Kein Git-Repository gefunden in $ROOT_DIR"
   exit 1
@@ -31,10 +51,10 @@ fi
 
 # Ensure remote origin is set (first-time setup on server)
 REPO_URL="${GITHUB_REPO_URL:-https://github.com/HJS72/EMSServer.git}"
-if ! git remote get-url origin &>/dev/null; then
-  git remote add origin "$REPO_URL"
-elif [[ "$(git remote get-url origin)" != "$REPO_URL" ]]; then
-  git remote set-url origin "$REPO_URL"
+if ! run_as_app "git remote get-url origin" &>/dev/null; then
+  run_as_app "git remote add origin '$REPO_URL'"
+elif [[ "$(run_as_app "git remote get-url origin")" != "$REPO_URL" ]]; then
+  run_as_app "git remote set-url origin '$REPO_URL'"
 fi
 
 run_as_app "git fetch origin '$BRANCH'"
