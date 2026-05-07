@@ -66,6 +66,14 @@ if [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]; then
   exit 0
 fi
 
+# If this script was copied manually to the server, its local modification would
+# block the fast-forward pull that should update it. Reset only this file before
+# pulling; other local changes remain untouched and still fail loudly.
+if ! run_as_app "git diff --quiet -- scripts/update.sh"; then
+  echo "Setze lokale Anderung an scripts/update.sh fur Self-Update zuruck"
+  run_as_app "git checkout -- scripts/update.sh"
+fi
+
 run_as_app "git pull --ff-only origin '$BRANCH'"
 run_as_app "'$ROOT_DIR/.venv/bin/pip' install -r requirements.txt"
 
