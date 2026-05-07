@@ -879,6 +879,17 @@
           grid.appendChild(field("Forecast kWp", bind("forecast_kwp"), device.forecast_kwp, "z.B. 10.0"));
           grid.appendChild(field("Forecast Azimut", bind("forecast_azimuth"), device.forecast_azimuth, "z.B. 180"));
           grid.appendChild(field("Forecast Neigung", bind("forecast_declination"), device.forecast_declination, "z.B. 35"));
+
+          if (inferType(device) === "pv_battery") {
+            const rowBreak = document.createElement("div");
+            rowBreak.className = "field field-full";
+            rowBreak.style.padding = "0";
+            rowBreak.style.margin = "0";
+            rowBreak.style.border = "0";
+            rowBreak.style.minHeight = "0";
+            rowBreak.style.height = "0";
+            grid.appendChild(rowBreak);
+          }
         }
 
         if (inferType(device) === "pv_battery") {

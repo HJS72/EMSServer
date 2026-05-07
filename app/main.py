@@ -35,7 +35,7 @@ iobroker = IoBrokerSource(settings)
 config_service = DataPointConfigService(settings.data_dir)
 pv_service = PvForecastService(settings, config_service)
 storage = Storage(settings.data_dir)
-engine = ForecastEngine(settings, influx, iobroker, pv_service, storage)
+engine = ForecastEngine(settings, influx, iobroker, pv_service, config_service, storage)
 scheduler = AsyncIOScheduler(timezone=settings.timezone)
 
 templates = Jinja2Templates(directory="app/templates")

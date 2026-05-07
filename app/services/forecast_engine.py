@@ -6,6 +6,7 @@ import json
 
 from app.config import Settings
 from app.models import CompareResponse, ComparePoint, ForecastResponse, HourPoint, ActualsResponse
+from app.services.datapoint_config import DataPointConfigService
 from app.services.influx_source import InfluxSource
 from app.services.iobroker_source import IoBrokerSource
 from app.services.pv_forecast import PvForecastService
@@ -19,13 +20,42 @@ class ForecastEngine:
         influx: InfluxSource,
         iobroker: IoBrokerSource,
         pv_service: PvForecastService,
+        config_service: DataPointConfigService,
         storage: Storage,
     ) -> None:
         self.settings = settings
         self.influx = influx
         self.iobroker = iobroker
         self.pv_service = pv_service
+        self.config_service = config_service
         self.storage = storage
+
+    def _grid_sources(self) -> tuple[str, str]:
+        try:
+            config = self.config_service.load()
+            import_source = (config.grid.import_source or "influx").strip().lower()
+            export_source = (config.grid.export_source or "influx").strip().lower()
+            if import_source not in {"influx", "iobroker"}:
+                import_source = "influx"
+            if export_source not in {"influx", "iobroker"}:
+                export_source = "influx"
+            return import_source, export_source
+        except Exception:
+            return "influx", "influx"
+
+    def _safe_history_by_source(self, source: str, state_key: str, days: int, custom_query: str = ""):
+        if not state_key:
+            return []
+        if source == "iobroker":
+            return self._safe_iobroker_history(state_key, days)
+        return self._safe_influx_history(state_key=state_key, days=days, custom_query=custom_query)
+
+    def _safe_today_by_source(self, source: str, state_key: str, custom_query: str = ""):
+        if not state_key:
+            return []
+        if source == "iobroker":
+            return self._safe_iobroker_today(state_key)
+        return self._safe_influx_today(state_key=state_key, custom_query=custom_query)
 
     def _safe_influx_history(self, state_key: str, days: int, custom_query: str = ""):
         try:
@@ -56,20 +86,19 @@ class ForecastEngine:
             return []
 
     def _hourly_grid_baseline(self) -> dict[int, float]:
-        grid_import_history = self._safe_influx_history(
+        import_source, export_source = self._grid_sources()
+        grid_import_history = self._safe_history_by_source(
+            source=import_source,
             state_key=self.settings.state_grid_import_key,
             days=self.settings.history_days,
             custom_query=self.settings.influx_grid_import_query,
         )
-        if not grid_import_history:
-            grid_import_history = self._safe_iobroker_history(self.settings.state_grid_import_key, self.settings.history_days)
-        grid_export_history = self._safe_influx_history(
+        grid_export_history = self._safe_history_by_source(
+            source=export_source,
             state_key=self.settings.state_grid_export_key,
             days=self.settings.history_days,
             custom_query=self.settings.influx_grid_export_query,
         )
-        if not grid_export_history:
-            grid_export_history = self._safe_iobroker_history(self.settings.state_grid_export_key, self.settings.history_days)
 
         now_local = datetime.now().astimezone()
         grouped: dict[int, list[float]] = defaultdict(list)
@@ -192,18 +221,17 @@ class ForecastEngine:
             )
             if not pv_series:
                 pv_series = self._safe_iobroker_today(self.settings.state_pv_key)
-        grid_import_series = self._safe_influx_today(
+        import_source, export_source = self._grid_sources()
+        grid_import_series = self._safe_today_by_source(
+            source=import_source,
             state_key=self.settings.state_grid_import_key,
             custom_query=self.settings.influx_grid_import_query,
         )
-        if not grid_import_series:
-            grid_import_series = self._safe_iobroker_today(self.settings.state_grid_import_key)
-        grid_export_series = self._safe_influx_today(
+        grid_export_series = self._safe_today_by_source(
+            source=export_source,
             state_key=self.settings.state_grid_export_key,
             custom_query=self.settings.influx_grid_export_query,
         )
-        if not grid_export_series:
-            grid_export_series = self._safe_iobroker_today(self.settings.state_grid_export_key)
 
         now_tz = datetime.now().astimezone().tzinfo
         by_hour_consumption: dict[int, float] = {p.time.astimezone(now_tz).hour: max(0.0, p.value) / 1000.0 for p in consumption_series}
@@ -283,20 +311,19 @@ class ForecastEngine:
         )
         if not pv_history:
             pv_history = self._safe_iobroker_history(self.settings.state_pv_key, days)
-        grid_import_history = self._safe_influx_history(
+        import_source, export_source = self._grid_sources()
+        grid_import_history = self._safe_history_by_source(
+            source=import_source,
             state_key=self.settings.state_grid_import_key,
             days=days,
             custom_query=self.settings.influx_grid_import_query,
         )
-        if not grid_import_history:
-            grid_import_history = self._safe_iobroker_history(self.settings.state_grid_import_key, days)
-        grid_export_history = self._safe_influx_history(
+        grid_export_history = self._safe_history_by_source(
+            source=export_source,
             state_key=self.settings.state_grid_export_key,
             days=days,
             custom_query=self.settings.influx_grid_export_query,
         )
-        if not grid_export_history:
-            grid_export_history = self._safe_iobroker_history(self.settings.state_grid_export_key, days)
 
         tz = datetime.now().astimezone().tzinfo
         actual_day_totals: dict[str, dict[str, float]] = defaultdict(lambda: {"consumption_kwh": 0.0, "pv_kwh": 0.0, "net_grid_kwh": 0.0})
