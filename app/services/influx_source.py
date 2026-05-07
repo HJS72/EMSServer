@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -32,6 +33,25 @@ class InfluxSource:
 
     def close(self) -> None:
         self._client.close()
+
+    async def is_connected(self) -> bool:
+        url = f"{self.settings.influx_url.rstrip('/')}/health"
+        headers = {"Accept": "application/json"}
+        if self.settings.influx_token:
+            headers["Authorization"] = f"Token {self.settings.influx_token}"
+
+        try:
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                response = await client.get(url, headers=headers)
+                if response.status_code < 500:
+                    return True
+        except Exception:
+            pass
+
+        try:
+            return bool(await asyncio.to_thread(self._client.ping))
+        except Exception:
+            return False
 
     @staticmethod
     def _escape_flux_string(value: str) -> str:

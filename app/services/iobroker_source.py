@@ -41,6 +41,27 @@ class IoBrokerSource:
         """Alias for get_current_value for compatibility."""
         return await self.get_current_value(state_id)
 
+    async def is_connected(self) -> bool:
+        base = self.settings.iobroker_url.rstrip("/")
+        probe_urls = [
+            base,
+            f"{base}/getPlainValue/system.adapter.simple-api.0.alive",
+        ]
+
+        try:
+            async with httpx.AsyncClient(timeout=4.0, auth=self._auth()) as client:
+                for url in probe_urls:
+                    try:
+                        response = await client.get(url)
+                        if response.status_code < 500:
+                            return True
+                    except Exception:
+                        continue
+        except Exception:
+            return False
+
+        return False
+
     def get_history(
         self,
         state_id: str,

@@ -133,10 +133,51 @@
       font-size: 0.8rem;
       color: var(--muted);
       transition: color 0.3s ease;
-      flex: 1;
+      flex: 0 1 auto;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .footer-connections {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .conn-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.72rem;
+      line-height: 1;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.22rem 0.5rem;
+      background: #0b1825;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .conn-pill.ok {
+      color: #c3f0d9;
+      border-color: #2f6a50;
+      background: #143126;
+    }
+
+    .conn-pill.err {
+      color: #ffd7cf;
+      border-color: #7a3e31;
+      background: #3a1d18;
+    }
+
+    .conn-pill.unknown {
+      color: #e8f0f7;
+      border-color: #35516b;
+      background: #13263b;
     }
 
     .footer-status.ok   { color: var(--good); }
@@ -419,6 +460,7 @@
 
   <footer class="app-footer">
     <div class="app-footer-inner">
+      <span id="footerConnections" class="footer-connections"></span>
       <span id="footerStatus" class="footer-status"></span>
       <span id="footerTime" class="footer-time"></span>
     </div>
@@ -436,6 +478,12 @@
     const appState = {
       devices: [],
       dragId: "",
+    };
+
+    const connectionState = {
+      iobroker: null,
+      influx: null,
+      pv_forecast: null,
     };
 
     const typeMeta = {
@@ -465,6 +513,42 @@
           el.textContent = '';
           el.className = 'footer-status';
         }, 5000);
+      }
+    }
+
+    function renderConnectionBadge(label, connected) {
+      const stateClass = connected === true ? 'ok' : (connected === false ? 'err' : 'unknown');
+      const stateText = connected === true ? 'Connected' : (connected === false ? 'Offline' : 'Prufe...');
+      return `<span class="conn-pill ${stateClass}">${label}: ${stateText}</span>`;
+    }
+
+    function renderFooterConnections() {
+      const el = document.getElementById('footerConnections');
+      if (!el) return;
+      el.innerHTML = [
+        renderConnectionBadge('ioBroker', connectionState.iobroker),
+        renderConnectionBadge('Influx', connectionState.influx),
+        renderConnectionBadge('PV-Vorhersage', connectionState.pv_forecast),
+      ].join('');
+    }
+
+    async function refreshConnectionStatus() {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      try {
+        const res = await fetch('/api/status/connections', { signal: ctrl.signal });
+        if (!res.ok) throw new Error('status endpoint failed');
+        const payload = await res.json();
+        connectionState.iobroker = payload?.iobroker?.connected === true;
+        connectionState.influx = payload?.influx?.connected === true;
+        connectionState.pv_forecast = payload?.pv_forecast?.connected === true;
+      } catch (_) {
+        connectionState.iobroker = false;
+        connectionState.influx = false;
+        connectionState.pv_forecast = false;
+      } finally {
+        clearTimeout(timer);
+        renderFooterConnections();
       }
     }
 
@@ -1095,6 +1179,10 @@
         setStatus("Speichern fehlgeschlagen", "err");
       }
     });
+
+    renderFooterConnections();
+    refreshConnectionStatus();
+    setInterval(refreshConnectionStatus, 30 * 1000);
 
     loadConfig().catch(err => {
       console.error(err);

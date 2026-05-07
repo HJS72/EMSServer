@@ -78,6 +78,32 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/status/connections")
+async def status_connections() -> JSONResponse:
+    async def safe_probe(coro, timeout: float = 6.0) -> bool:
+        try:
+            return bool(await asyncio.wait_for(coro, timeout=timeout))
+        except Exception:
+            return False
+
+    iobroker_connected, influx_connected, pv_connected = await asyncio.gather(
+        safe_probe(iobroker.is_connected()),
+        safe_probe(influx.is_connected()),
+        safe_probe(pv_service.is_connected()),
+    )
+
+    return JSONResponse(
+        {
+            "iobroker": {"connected": iobroker_connected},
+            "influx": {"connected": influx_connected},
+            "pv_forecast": {
+                "connected": pv_connected,
+                "provider": settings.pv_provider,
+            },
+        }
+    )
+
+
 @app.get("/api/forecast/today")
 async def forecast_today() -> JSONResponse:
     cached = engine.load_cached_forecast()

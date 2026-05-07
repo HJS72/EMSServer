@@ -119,3 +119,26 @@ class PvForecastService:
             return {hour: 0.0 for hour in range(24)}
 
         return merged
+
+    async def is_connected(self) -> bool:
+        if self.settings.pv_provider.lower() != "forecast_solar":
+            return False
+
+        systems = self._configured_pv_systems()
+        if not systems:
+            return False
+
+        probe = systems[0]
+        url = (
+            f"https://api.forecast.solar/estimate/"
+            f"{probe['lat']}/{probe['lon']}/{probe['declination']}/{probe['azimuth']}/{probe['kwp']}"
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                payload = response.json()
+            return isinstance(payload.get("result", {}).get("watt_hours_period", {}), dict)
+        except Exception:
+            return False
