@@ -92,6 +92,16 @@ def devices_to_datapoints(devices_config: dict) -> List[DataPoint]:
             
             # Alias: device_id + measurement_key
             alias = f"{device_id}_{measurement_key}"
+
+            unit = measurement.get("unit", "")
+            scale = float(measurement.get("scale", 1.0))
+            is_energy = "energy" in measurement_key.lower()
+
+            # Energie-Werte werden konsistent in kWh gespeichert.
+            if is_energy:
+                if unit == "Wh":
+                    scale = scale / 1000.0
+                unit = "kWh"
             
             dp = DataPoint(
                 id=iobroker_id,
@@ -99,8 +109,8 @@ def devices_to_datapoints(devices_config: dict) -> List[DataPoint]:
                 measurement=f"{device_type}_{measurement_key}",  # z.B. "grid_power", "producer_energy"
                 device_id=device_id,
                 device_type=device_type,
-                unit=measurement.get("unit", ""),
-                scale=measurement.get("scale", 1.0),
+                unit=unit,
+                scale=scale,
                 writable=measurement.get("writable", False),
             )
             datapoints.append(dp)
