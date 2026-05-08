@@ -240,6 +240,14 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
         }
+
+        .nav-btn:disabled {
+            background: #cbd5e1;
+            color: #64748b;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
         
         .nav-btn:active {
             transform: translateY(0);
@@ -275,10 +283,10 @@
         </div>
         
         <div class="date-navigator">
-            <button class="nav-btn" onclick="previousDay()">◀ Gestern</button>
+            <button id="btn-prev" class="nav-btn" onclick="previousDay()">◀ Gestern</button>
             <div class="date-display" id="date-display">Loading...</div>
-            <button class="nav-btn" onclick="today()">Heute</button>
-            <button class="nav-btn" onclick="nextDay()">Morgen ▶</button>
+            <button id="btn-today" class="nav-btn" onclick="today()">Heute</button>
+            <button id="btn-next" class="nav-btn" onclick="nextDay()">Morgen ▶</button>
         </div>
         
         <div id="error-container"></div>
@@ -304,43 +312,75 @@
 
     <script>
         let chart = null;
-        let currentDate = new Date();
+        let currentDate = startOfLocalDay(new Date());
+        const MAX_DAYS_AHEAD = 1;
+
+        function startOfLocalDay(date) {
+            const next = new Date(date);
+            next.setHours(0, 0, 0, 0);
+            return next;
+        }
+
+        function addDays(date, days) {
+            const next = startOfLocalDay(date);
+            next.setDate(next.getDate() + days);
+            return next;
+        }
+
+        function maxNavigableDate() {
+            return addDays(new Date(), MAX_DAYS_AHEAD);
+        }
+
+        function isSameDay(left, right) {
+            return left.getFullYear() === right.getFullYear()
+                && left.getMonth() === right.getMonth()
+                && left.getDate() === right.getDate();
+        }
+
+        function updateNavigatorState() {
+            document.getElementById('btn-next').disabled = isSameDay(currentDate, maxNavigableDate());
+        }
         
         function setDate(date) {
-            currentDate = new Date(date);
+            const targetDate = startOfLocalDay(date);
+            const maxDate = maxNavigableDate();
+            currentDate = targetDate > maxDate ? maxDate : targetDate;
             loadDashboard();
         }
         
         function previousDay() {
-            currentDate.setDate(currentDate.getDate() - 1);
+            currentDate = addDays(currentDate, -1);
             loadDashboard();
         }
         
         function today() {
-            currentDate = new Date();
+            currentDate = startOfLocalDay(new Date());
             loadDashboard();
         }
         
         function nextDay() {
-            currentDate.setDate(currentDate.getDate() + 1);
+            const nextDate = addDays(currentDate, 1);
+            const maxDate = maxNavigableDate();
+            currentDate = nextDate > maxDate ? maxDate : nextDate;
             loadDashboard();
         }
         
         function getDateString(date) {
-            return date.toISOString().split('T')[0];
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
         
         function formatDateDisplay(date) {
-            const today = new Date();
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
+            const today = startOfLocalDay(new Date());
+            const yesterday = addDays(today, -1);
+            const tomorrow = addDays(today, 1);
             
-            const dateStr = date.toISOString().split('T')[0];
-            const todayStr = today.toISOString().split('T')[0];
-            const yesterdayStr = yesterday.toISOString().split('T')[0];
-            const tomorrowStr = tomorrow.toISOString().split('T')[0];
+            const dateStr = getDateString(date);
+            const todayStr = getDateString(today);
+            const yesterdayStr = getDateString(yesterday);
+            const tomorrowStr = getDateString(tomorrow);
             
             if (dateStr === todayStr) return 'Heute';
             if (dateStr === yesterdayStr) return 'Gestern';
@@ -351,6 +391,7 @@
 
         async function loadDashboard() {
             try {
+                updateNavigatorState();
                 const dateStr = getDateString(currentDate);
                 document.getElementById('date-display').textContent = formatDateDisplay(currentDate);
                 
@@ -465,7 +506,7 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: '📊 Prognose',
+                            label: 'PV gesamt',
                             data: forecastValues,
                             borderColor: '#3b82f6',
                             backgroundColor: 'rgba(59, 130, 246, 0.1)',
