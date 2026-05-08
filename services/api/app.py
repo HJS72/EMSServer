@@ -86,6 +86,110 @@ def save_control_config(data: Dict[str, Any]) -> Dict[str, Any]:
     return serialized
 
 
+def _measurement_iobroker_id(device: Device, measurement_key: str) -> Optional[str]:
+    measurement = device.measurements.get(measurement_key)
+    if not measurement:
+        return None
+    return measurement.iobroker_id or None
+
+
+def _state_value_from_snapshot(states: Dict[str, Any], state_id: Optional[str]) -> Any:
+    if not state_id:
+        return None
+    state_data = states.get(state_id)
+    if isinstance(state_data, dict):
+        return state_data.get("val")
+    return None
+
+
+def _coerce_float(value: Any) -> Optional[float]:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _merge_control_devices(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Ergaenze Steuerkonfiguration aus angelegten Devices und Live-States."""
+    devices_config = load_devices_config()
+    relevant_types = {
+        "dhw": DeviceType.DHW,
+        "climate": DeviceType.CLIMATE,
+        "wallbox": DeviceType.WALLBOX,
+    }
+
+    selected_devices: Dict[str, Device] = {}
+    for section, device_type in relevant_types.items():
+        device = next(
+            (item for item in devices_config.devices if item.enabled and item.type == device_type),
+            None,
+        )
+        if device:
+            selected_devices[section] = device
+
+    if not selected_devices:
+        return config
+
+    states = get_iobroker_states_sync()
+
+    for section, device in selected_devices.items():
+        section_cfg = config.get(section)
+        if not isinstance(section_cfg, dict):
+            section_cfg = {}
+        config[section] = section_cfg
+
+        section_cfg.setdefault("device_id", device.id)
+
+        if section == "dhw":
+            command_state_id = _measurement_iobroker_id(device, "enabled")
+            status_state_id = _measurement_iobroker_id(device, "windows")
+            temp_state_id = _measurement_iobroker_id(device, "temp_water")
+
+            if command_state_id and not section_cfg.get("command_state_id"):
+                section_cfg["command_state_id"] = command_state_id
+            if status_state_id and not section_cfg.get("status_state_id"):
+                section_cfg["status_state_id"] = status_state_id
+            if "temp_current_c" not in section_cfg:
+                live_temp = _coerce_float(_state_value_from_snapshot(states, temp_state_id))
+                if live_temp is not None:
+                    section_cfg["temp_current_c"] = live_temp
+
+        elif section == "climate":
+            command_state_id = _measurement_iobroker_id(device, "enabled")
+            status_state_id = _measurement_iobroker_id(device, "windows")
+            temp_state_id = _measurement_iobroker_id(device, "temp_room")
+
+            if command_state_id and not section_cfg.get("command_state_id"):
+                section_cfg["command_state_id"] = command_state_id
+            if status_state_id and not section_cfg.get("status_state_id"):
+                section_cfg["status_state_id"] = status_state_id
+            if "temp_current_c" not in section_cfg:
+                live_temp = _coerce_float(_state_value_from_snapshot(states, temp_state_id))
+                if live_temp is not None:
+                    section_cfg["temp_current_c"] = live_temp
+
+        elif section == "wallbox":
+            command_state_id = _measurement_iobroker_id(device, "enabled")
+            status_state_id = _measurement_iobroker_id(device, "plan")
+            auto_mode_state_id = _measurement_iobroker_id(device, "auto_mode")
+            soc_state_id = _measurement_iobroker_id(device, "vehicle_soc")
+
+            if command_state_id and not section_cfg.get("command_state_id"):
+                section_cfg["command_state_id"] = command_state_id
+            if status_state_id and not section_cfg.get("status_state_id"):
+                section_cfg["status_state_id"] = status_state_id
+            if auto_mode_state_id and not section_cfg.get("auto_mode_state_id"):
+                section_cfg["auto_mode_state_id"] = auto_mode_state_id
+            if "vehicle_soc_pct" not in section_cfg:
+                live_soc = _coerce_float(_state_value_from_snapshot(states, soc_state_id))
+                if live_soc is not None:
+                    section_cfg["vehicle_soc_pct"] = live_soc
+
+    return config
+
+
 def _slugify(value: str) -> str:
     """Konvertiert Text in eine stabile ID-kompatible Form."""
     value = value.strip().lower()
@@ -391,6 +495,7 @@ def create_control_plan_endpoint():
 
         merged.setdefault("iobroker_host", IOBROKER_HOST)
         merged.setdefault("iobroker_port", IOBROKER_PORT)
+        merged = _merge_control_devices(merged)
 
         payload = ControlPlanRequest(**merged)
 

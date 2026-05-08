@@ -4,7 +4,7 @@ Backend-API für EMS mit Device-Management und ioBroker-Integration.
 
 ## Features
 
-- **Device Management**: Verwaltung von Geräten (Grid, Producer, Consumer, Battery)
+- **Device Management**: Verwaltung von Geräten (Grid, Producer, Consumer, DHW, Climate, Wallbox, Battery, Hybrid)
 - **ioBroker Integration**: Auswahl von States aus ioBroker
 - **Device Manager UI**: Web-Interface zur Konfiguration
 - **REST API**: Vollständige API für Device-Operationen
@@ -113,6 +113,7 @@ Hinweis:
 
 - `POST /api/control/plan` verwendet automatisch die gespeicherte Konfiguration.
 - Im Request koennen einzelne Felder ueberschrieben werden (z. B. nur aktuelle Temperaturen oder aktueller EV-SoC).
+- Wenn Devices vom Typ `dhw`, `climate` oder `wallbox` konfiguriert sind, uebernimmt der Planer fehlende State-IDs und Live-Werte automatisch aus `/etc/ems/devices.json` und den zugeordneten ioBroker States.
 
 Beispiel-Request:
 
@@ -189,6 +190,40 @@ Messwerte für Erzeuger:
 
 Messwerte für Verbraucher:
 - **power**: Momentanleistung (W)
+- **energy_today**: Tagesenergie (kWh) [optional]
+
+### DHW (Brauchwasser-Waermepumpe)
+
+Messwerte fuer steuerbares Warmwasser:
+- **power**: Momentanleistung (W)
+- **temp_water**: Warmwassertemperatur (°C)
+- **enabled**: Freigabe EIN/AUS [writable, optional]
+- **temp_min**: Temperatur Minimum (°C) [optional]
+- **temp_max**: Temperatur Maximum (°C) [optional]
+- **windows**: Geplante Laufzeiten (JSON) [optional]
+- **energy_today**: Tagesenergie (kWh) [optional]
+
+### Climate (Klimaanlage / Kuehlung)
+
+Messwerte fuer steuerbare Kuehlung:
+- **power**: Momentanleistung (W)
+- **temp_room**: Raumtemperatur (°C)
+- **enabled**: Freigabe EIN/AUS [writable, optional]
+- **temp_min**: Temperatur Minimum (°C) [optional]
+- **temp_max**: Temperatur Maximum (°C) [optional]
+- **windows**: Geplante Laufzeiten (JSON) [optional]
+- **energy_today**: Tagesenergie (kWh) [optional]
+
+### Wallbox (EV-Ladepunkt)
+
+Messwerte fuer steuerbare Fahrzeugladung:
+- **charging_power**: Aktuelle Ladeleistung (W)
+- **vehicle_soc**: Fahrzeug-SoC (%)
+- **auto_mode**: Auto-Modus [writable, optional]
+- **enabled**: Freigabe EIN/AUS [writable, optional]
+- **power_setpoint**: Ladeleistung Sollwert (W) [writable, optional]
+- **phase_mode**: Phasenmodus [optional]
+- **plan**: Ladeplan / Status (JSON) [optional]
 - **energy_today**: Tagesenergie (kWh) [optional]
 
 ### Battery (Speicher)
