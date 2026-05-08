@@ -93,6 +93,9 @@ class Collector:
                 logger.debug("Nicht-numerischer Wert fuer %s: %r", state_id, raw_val)
                 continue
 
+            if not dp.allow_negative:
+                value = abs(value)
+
             raw_points.append(
                 Point(dp.measurement)
                 .tag("site", self.cfg.site)

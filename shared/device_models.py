@@ -24,6 +24,8 @@ class MeasurementMapping(BaseModel):
     writable: bool = False  # Kann geschrieben werden?
     scale: float = 1.0      # Skalierungsfaktor
     required: bool = True   # Erforderlich für diesen Device-Typ?
+    allow_negative: bool = False  # Negative Werte werden unveraendert uebernommen
+    invert_sign: bool = False     # Vorzeichen vor Speicherung invertieren
 
 
 class Device(BaseModel):
@@ -48,6 +50,7 @@ DEVICE_TEMPLATES = {
                 unit="W",
                 writable=False,
                 required=True,
+                allow_negative=True,
             ),
             "power_import": MeasurementMapping(
                 name="Leistung Bezug (+)",
@@ -62,6 +65,7 @@ DEVICE_TEMPLATES = {
                 unit="W",
                 writable=False,
                 required=False,
+                allow_negative=True,
             ),
             "energy_import_today": MeasurementMapping(
                 name="Tagesenergie Bezug",
@@ -88,6 +92,7 @@ DEVICE_TEMPLATES = {
                 unit="W",
                 writable=False,
                 required=True,
+                allow_negative=True,
             ),
             "energy_today": MeasurementMapping(
                 name="Tagesenergie",
@@ -133,6 +138,7 @@ DEVICE_TEMPLATES = {
                 unit="W",
                 writable=False,
                 required=True,
+                allow_negative=True,
             ),
             "soc": MeasurementMapping(
                 name="Ladezustand (SoC)",

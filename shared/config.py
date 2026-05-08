@@ -43,6 +43,7 @@ class DataPoint(BaseModel):
     unit: str
     scale: float = 1.0
     writable: bool = False
+    allow_negative: bool = False
 
 
 class EMSConfig(BaseModel):
@@ -110,8 +111,9 @@ def devices_to_datapoints(devices_config: dict) -> List[DataPoint]:
                 device_id=device_id,
                 device_type=device_type,
                 unit=unit,
-                scale=scale,
+                scale=-scale if measurement.get("invert_sign", False) else scale,
                 writable=measurement.get("writable", False),
+                allow_negative=measurement.get("allow_negative", False),
             )
             datapoints.append(dp)
     
