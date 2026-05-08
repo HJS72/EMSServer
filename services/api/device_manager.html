@@ -609,6 +609,13 @@
             // Render measurements
             for (const [key, meas] of Object.entries(currentDevice.measurements || {})) {
                 const required = meas.required ? '<span class="measurement-required">erforderlich</span>' : '';
+                const isEnergyMeasurement = key.toLowerCase().includes("energy") || ["wh", "kwh"].includes((meas.unit || "").toLowerCase());
+                const unitControl = isEnergyMeasurement
+                    ? `<select onchange="currentDevice.measurements['${key}'].unit = this.value">
+                           <option value="Wh" ${meas.unit === 'Wh' ? 'selected' : ''}>Wh</option>
+                           <option value="kWh" ${meas.unit === 'kWh' ? 'selected' : ''}>kWh</option>
+                       </select>`
+                    : `<input type="text" value="${meas.unit || ''}" readonly style="background: #f5f5f5;">`;
                 html += `
                     <div class="measurement-item">
                         <div class="measurement-name">
@@ -624,8 +631,7 @@
                             </div>
                             <div>
                                 <label>Einheit</label>
-                                <input type="text" value="${meas.unit || ''}" readonly 
-                                       style="background: #f5f5f5;">
+                                ${unitControl}
                             </div>
                         </div>
                     </div>
