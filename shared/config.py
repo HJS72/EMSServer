@@ -55,13 +55,42 @@ class EMSConfig(BaseModel):
     datapoints: List[DataPoint] = []
 
 
+def _load_token_from_secrets_env(path: str = "/etc/ems/secrets.env") -> str | None:
+    """Liest EMS_INFLUX_TOKEN aus einer einfachen KEY=VALUE-Datei."""
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path) as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                if key.strip() == "EMS_INFLUX_TOKEN":
+                    token = value.strip().strip('"').strip("'")
+                    return token or None
+    except Exception:
+        return None
+    return None
+
+
 def load_config(path: str | None = None) -> EMSConfig:
     config_path = path or os.environ.get("EMS_CONFIG", "/etc/ems/config.yaml")
     with open(config_path) as f:
         raw = yaml.safe_load(f)
-    # InfluxDB-Token kann per Umgebungsvariable ueberschrieben werden
-    if token := os.environ.get("EMS_INFLUX_TOKEN"):
-        raw.setdefault("influxdb", {})["token"] = token
+    influx_cfg = raw.setdefault("influxdb", {})
+
+    # InfluxDB-Token bevorzugt aus Umgebungsvariable.
+    token = os.environ.get("EMS_INFLUX_TOKEN")
+    if token:
+        influx_cfg["token"] = token
+    else:
+        current = str(influx_cfg.get("token", "") or "").strip()
+        # Fallback fuer Deployments mit Platzhalter in config.yaml.
+        if (not current) or current.startswith("__REPLACE_WITH_"):
+            fallback = _load_token_from_secrets_env()
+            if fallback:
+                influx_cfg["token"] = fallback
     return EMSConfig(**raw)
 
 

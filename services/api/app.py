@@ -884,14 +884,18 @@ def _get_consumption_labels() -> Dict[str, str]:
 
 
 def _build_actual_consumption_hourly(target_date) -> List[Dict[str, Any]]:
-    """Liefert IST-Verbrauch pro Stunde aus Influx 15m-Aggregaten.
+    """Liefert IST-Verbrauch pro Stunde aus Influx.
 
     Rückgabe pro Stunde:
     - dhw_w, climate_w, wallbox_w: gemessene steuerbare Verbraucher
     - consumers_total_w: Summe steuerbare Verbraucher
     - house_w: gemessener Gesamtverbrauch Haus (Device-ID: gesamtverbrauch)
+
+    Bevorzugt werden 15m-Aggregate (ems_agg). Falls fuer eine Stunde keine
+    Aggregatwerte vorliegen, wird stundenweise auf Rohdaten (ems_raw)
+    zurueckgefallen.
     """
-    hourly: Dict[int, Dict[str, float]] = {
+    hourly_agg: Dict[int, Dict[str, float]] = {
         hour: {
             "dhw_w": 0.0,
             "climate_w": 0.0,
@@ -900,7 +904,25 @@ def _build_actual_consumption_hourly(target_date) -> List[Dict[str, Any]]:
         }
         for hour in range(24)
     }
-    counts: Dict[int, Dict[str, int]] = {
+    counts_agg: Dict[int, Dict[str, int]] = {
+        hour: {
+            "dhw_w": 0,
+            "climate_w": 0,
+            "wallbox_w": 0,
+            "house_w": 0,
+        }
+        for hour in range(24)
+    }
+    hourly_raw: Dict[int, Dict[str, float]] = {
+        hour: {
+            "dhw_w": 0.0,
+            "climate_w": 0.0,
+            "wallbox_w": 0.0,
+            "house_w": 0.0,
+        }
+        for hour in range(24)
+    }
+    counts_raw: Dict[int, Dict[str, int]] = {
         hour: {
             "dhw_w": 0,
             "climate_w": 0,
@@ -917,7 +939,7 @@ def _build_actual_consumption_hourly(target_date) -> List[Dict[str, Any]]:
         start_utc = start_local.astimezone(ZoneInfo("UTC")).isoformat()
         stop_utc = stop_local.astimezone(ZoneInfo("UTC")).isoformat()
 
-        flux = f'''
+        flux_agg = f'''
 from(bucket: "{cfg.influxdb.bucket_agg}")
   |> range(start: {start_utc}, stop: {stop_utc})
   |> filter(fn: (r) => r["_field"] == "value")
@@ -929,47 +951,75 @@ from(bucket: "{cfg.influxdb.bucket_agg}")
     (r["_measurement"] == "consumer_power" and r["device_id"] == "gesamtverbrauch")
   )
 '''
+        flux_raw = f'''
+from(bucket: "{cfg.influxdb.bucket_raw}")
+  |> range(start: {start_utc}, stop: {stop_utc})
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> filter(fn: (r) =>
+    r["_measurement"] == "dhw_power" or
+    r["_measurement"] == "climate_power" or
+    r["_measurement"] == "wallbox_charging_power" or
+    (r["_measurement"] == "consumer_power" and r["device_id"] == "gesamtverbrauch")
+  )
+'''
 
         with InfluxDBClient(url=cfg.influxdb.url, token=cfg.influxdb.token, org=cfg.influxdb.org) as client:
-            tables = client.query_api().query(query=flux, org=cfg.influxdb.org)
+            query_api = client.query_api()
+            tables_agg = query_api.query(query=flux_agg, org=cfg.influxdb.org)
+            tables_raw = query_api.query(query=flux_raw, org=cfg.influxdb.org)
 
-        for table in tables:
+        def _consume_record(record: Any, sums: Dict[int, Dict[str, float]], cnts: Dict[int, Dict[str, int]]) -> None:
+            ts = record.get_time()
+            if ts is None:
+                return
+            local_ts = ts.astimezone(DASHBOARD_TIMEZONE)
+            if local_ts.date() != target_date:
+                return
+
+            hour = local_ts.hour
+            measurement = record.values.get("_measurement")
+            device_id = record.values.get("device_id")
+            value = _coerce_float(record.get_value())
+            if value is None:
+                return
+
+            if measurement == "dhw_power":
+                sums[hour]["dhw_w"] += value
+                cnts[hour]["dhw_w"] += 1
+            elif measurement == "climate_power":
+                sums[hour]["climate_w"] += value
+                cnts[hour]["climate_w"] += 1
+            elif measurement == "wallbox_charging_power":
+                sums[hour]["wallbox_w"] += value
+                cnts[hour]["wallbox_w"] += 1
+            elif measurement == "consumer_power" and device_id == "gesamtverbrauch":
+                sums[hour]["house_w"] += value
+                cnts[hour]["house_w"] += 1
+
+        for table in tables_agg:
             for record in table.records:
-                ts = record.get_time()
-                if ts is None:
-                    continue
-                local_ts = ts.astimezone(DASHBOARD_TIMEZONE)
-                if local_ts.date() != target_date:
-                    continue
+                _consume_record(record, hourly_agg, counts_agg)
 
-                hour = local_ts.hour
-                measurement = record.values.get("_measurement")
-                device_id = record.values.get("device_id")
-                value = _coerce_float(record.get_value())
-                if value is None:
-                    continue
-
-                if measurement == "dhw_power":
-                    hourly[hour]["dhw_w"] += value
-                    counts[hour]["dhw_w"] += 1
-                elif measurement == "climate_power":
-                    hourly[hour]["climate_w"] += value
-                    counts[hour]["climate_w"] += 1
-                elif measurement == "wallbox_charging_power":
-                    hourly[hour]["wallbox_w"] += value
-                    counts[hour]["wallbox_w"] += 1
-                elif measurement == "consumer_power" and device_id == "gesamtverbrauch":
-                    hourly[hour]["house_w"] += value
-                    counts[hour]["house_w"] += 1
+        for table in tables_raw:
+            for record in table.records:
+                _consume_record(record, hourly_raw, counts_raw)
     except Exception as e:
         logger.warning(f"IST-Verbrauch aus Influx nicht verfügbar: {e}")
 
     result: List[Dict[str, Any]] = []
+
+    def _avg_with_fallback(hour: int, key: str) -> float:
+        if counts_agg[hour][key] > 0:
+            return round(hourly_agg[hour][key] / counts_agg[hour][key], 1)
+        if counts_raw[hour][key] > 0:
+            return round(hourly_raw[hour][key] / counts_raw[hour][key], 1)
+        return 0.0
+
     for hour in range(24):
-        dhw_w = round(hourly[hour]["dhw_w"] / (counts[hour]["dhw_w"] or 1), 1)
-        climate_w = round(hourly[hour]["climate_w"] / (counts[hour]["climate_w"] or 1), 1)
-        wallbox_w = round(hourly[hour]["wallbox_w"] / (counts[hour]["wallbox_w"] or 1), 1)
-        house_w = round(hourly[hour]["house_w"] / (counts[hour]["house_w"] or 1), 1)
+        dhw_w = _avg_with_fallback(hour, "dhw_w")
+        climate_w = _avg_with_fallback(hour, "climate_w")
+        wallbox_w = _avg_with_fallback(hour, "wallbox_w")
+        house_w = _avg_with_fallback(hour, "house_w")
         consumers_total_w = round(dhw_w + climate_w + wallbox_w, 1)
         result.append(
             {
