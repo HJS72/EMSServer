@@ -574,6 +574,37 @@
             }
         }
 
+        function getPowerSignMode(measurement) {
+            if (measurement.invert_sign) {
+                return "invert";
+            }
+            if (measurement.allow_negative) {
+                return "signed";
+            }
+            return "absolute";
+        }
+
+        function updatePowerSignMode(measurementKey, mode) {
+            if (!currentDevice || !currentDevice.measurements?.[measurementKey]) {
+                return;
+            }
+
+            if (mode === "invert") {
+                currentDevice.measurements[measurementKey].allow_negative = true;
+                currentDevice.measurements[measurementKey].invert_sign = true;
+                return;
+            }
+
+            if (mode === "signed") {
+                currentDevice.measurements[measurementKey].allow_negative = true;
+                currentDevice.measurements[measurementKey].invert_sign = false;
+                return;
+            }
+
+            currentDevice.measurements[measurementKey].allow_negative = false;
+            currentDevice.measurements[measurementKey].invert_sign = false;
+        }
+
         function renderEditor() {
             const container = document.getElementById("editor-content");
             const editorTitle = document.getElementById("editor-title");
@@ -618,17 +649,16 @@
                        </select>`
                     : `<input type="text" value="${meas.unit || ''}" readonly style="background: #f5f5f5;">`;
                 const signControl = isPowerMeasurement
-                    ? `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;">
-                           <label style="display:flex; gap:8px; align-items:center; font-weight:500; margin:0;">
-                               <input type="checkbox" ${meas.allow_negative ? 'checked' : ''}
-                                      onchange="currentDevice.measurements['${key}'].allow_negative = this.checked">
-                               Negative Werte zulassen
-                           </label>
-                           <label style="display:flex; gap:8px; align-items:center; font-weight:500; margin:0;">
-                               <input type="checkbox" ${meas.invert_sign ? 'checked' : ''}
-                                      onchange="currentDevice.measurements['${key}'].invert_sign = this.checked">
-                               Vorzeichen invertieren
-                           </label>
+                    ? `<div style="margin-top: 8px; display: grid; gap: 6px;">
+                           <label>Vorzeichenlogik</label>
+                           <select onchange="updatePowerSignMode('${key}', this.value)">
+                               <option value="absolute" ${getPowerSignMode(meas) === 'absolute' ? 'selected' : ''}>Immer positiv speichern</option>
+                               <option value="signed" ${getPowerSignMode(meas) === 'signed' ? 'selected' : ''}>Positiv/negativ wie geliefert</option>
+                               <option value="invert" ${getPowerSignMode(meas) === 'invert' ? 'selected' : ''}>Vorzeichen umdrehen</option>
+                           </select>
+                           <div style="font-size: 12px; color: #666; line-height: 1.4;">
+                               Grid-Beispiel: Bezug positiv, Einspeisung negativ. Wenn deine Quelle genau andersherum liefert, nutze "Vorzeichen umdrehen".
+                           </div>
                        </div>`
                     : "";
                 html += `
