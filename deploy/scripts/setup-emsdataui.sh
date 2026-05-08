@@ -20,7 +20,7 @@ echo "=== EMS DataUI Setup ==="
 
 # --- System-Pakete und Voraussetzungen ---------------------------------------
 apt-get update -qq
-apt-get install -y curl gnupg apt-transport-https software-properties-common
+apt-get install -y curl gnupg apt-transport-https ca-certificates
 
 # --- InfluxDB 2.x -------------------------------------------------------------
 if ! command -v influxd &>/dev/null; then
