@@ -6,6 +6,11 @@
 # =============================================================================
 set -euo pipefail
 
+if [[ "$(id -u)" -ne 0 ]]; then
+    echo "Fehler: Skript muss als root ausgefuehrt werden (z.B. 'bash setup-emscore.sh' als root-User im CT)."
+    exit 1
+fi
+
 REPO_URL="https://github.com/HJS72/EMSServer.git"
 INSTALL_DIR="/opt/ems/EMSServer"
 VENV_DIR="/opt/ems/venv"
@@ -72,8 +77,8 @@ EOF
 fi
 
 # --- SQLite Schema initialisieren --------------------------------------------
-sudo -u "$EMS_USER" "$VENV_DIR/bin/python" \
-    "$INSTALL_DIR/scripts/db_init.py" --db "$DATA_DIR/ems.db"
+su -s /bin/bash "$EMS_USER" -c \
+    "\"$VENV_DIR/bin/python\" \"$INSTALL_DIR/scripts/db_init.py\" --db \"$DATA_DIR/ems.db\""
 echo "  [+] SQLite-Schema initialisiert."
 
 # --- systemd Unit installieren -----------------------------------------------

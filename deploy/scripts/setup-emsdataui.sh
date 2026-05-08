@@ -6,6 +6,11 @@
 # =============================================================================
 set -euo pipefail
 
+if [[ "$(id -u)" -ne 0 ]]; then
+    echo "Fehler: Skript muss als root ausgefuehrt werden (z.B. 'bash setup-emsdataui.sh' als root-User im CT)."
+    exit 1
+fi
+
 INFLUX_ORG="ems"
 INFLUX_USER="admin"
 INFLUX_BUCKET_INIT="ems_raw"
