@@ -1,0 +1,147 @@
+EMSCore – Installationsanleitung (Debian 12 Bookworm)
+======================================================
+CT: 10.13.30.220
+Services: Collector, (später) Forecast, Optimizer, Dispatcher
+
+VORAUSSETZUNGEN
+---------------
+- Proxmox CT mit Debian 12 (Bookworm) Template
+- Mindestens 1 GB RAM, 10 GB Disk
+- Netzwerk konfiguriert, Internetzugang vorhanden
+- Anmeldung als root im CT (Proxmox-Konsole oder SSH)
+- EMSDataUI (10.13.30.221) ist bereits eingerichtet
+- InfluxDB API-Token aus EMSDataUI-Setup bereithalten
+
+
+SCHRITT 1 – System aktualisieren
+---------------------------------
+    apt-get update && apt-get upgrade -y
+
+
+SCHRITT 2 – Basis-Pakete installieren
+--------------------------------------
+    apt-get install -y git python3 python3-venv python3-pip sqlite3 curl
+
+
+SCHRITT 3 – Systembenutzer anlegen
+------------------------------------
+    useradd --system --no-create-home --shell /usr/sbin/nologin ems
+
+
+SCHRITT 4 – Verzeichnisse anlegen
+-----------------------------------
+    mkdir -p /opt/ems /var/lib/ems /etc/ems
+    chown ems:ems /var/lib/ems
+
+
+SCHRITT 5 – Repository klonen
+-------------------------------
+    git clone https://github.com/HJS72/EMSServer.git /opt/ems/EMSServer
+    chown -R ems:ems /opt/ems
+
+
+SCHRITT 6 – Python venv und Abhängigkeiten
+--------------------------------------------
+    python3 -m venv /opt/ems/venv
+    /opt/ems/venv/bin/pip install --upgrade pip
+    /opt/ems/venv/bin/pip install -r /opt/ems/EMSServer/requirements.txt
+
+
+SCHRITT 7 – Konfiguration anlegen
+-----------------------------------
+    cp /opt/ems/EMSServer/config/config.example.yaml /etc/ems/config.yaml
+    chmod 640 /etc/ems/config.yaml
+    chown root:ems /etc/ems/config.yaml
+
+    # Konfiguration anpassen:
+    nano /etc/ems/config.yaml
+
+    Folgende Felder MÜSSEN gesetzt werden:
+        iobroker:
+            host: "IP-ADRESSE-DES-IOBROKER"   # z.B. 10.13.30.100
+
+        influxdb:
+            token: "TOKEN-AUS-EMSDATAUI-SCHRITT-4"
+
+        datapoints:
+            # Alle "id:"-Felder auf echte ioBroker State-IDs ändern
+            # Beispiel: "modbus.0.holdingRegisters.pv_power"
+
+
+SCHRITT 8 – Secrets-Datei anlegen
+-----------------------------------
+    cat > /etc/ems/secrets.env << 'EOF'
+# EMS Secrets
+# EMS_INFLUX_TOKEN=token-hier-eintragen-falls-nicht-in-config.yaml
+EOF
+    chmod 640 /etc/ems/secrets.env
+    chown root:ems /etc/ems/secrets.env
+
+
+SCHRITT 9 – SQLite-Schema initialisieren
+------------------------------------------
+    su -s /bin/bash ems -c \
+        "/opt/ems/venv/bin/python /opt/ems/EMSServer/scripts/db_init.py --db /var/lib/ems/ems.db"
+
+    # Prüfen:
+    sqlite3 /var/lib/ems/ems.db ".tables"
+    # Erwartete Ausgabe: devices  device_constraints  dispatch_log
+    #                   forecast_runs  modes  optimizer_runs  priorities  targets
+
+
+SCHRITT 10 – InfluxDB Buckets anlegen
+---------------------------------------
+    EMS_CONFIG=/etc/ems/config.yaml \
+        /opt/ems/venv/bin/python /opt/ems/EMSServer/scripts/influx_setup.py
+
+    # Erwartete Ausgabe:
+    #   [+] Bucket 'ems_raw'      angelegt (Retention: 30d)
+    #   [+] Bucket 'ems_agg'      angelegt (Retention: 730d)
+    #   [+] Bucket 'ems_forecast' angelegt (Retention: 180d)
+    #   [+] Bucket 'ems_control'  angelegt (Retention: 365d)
+
+
+SCHRITT 11 – systemd Unit installieren
+----------------------------------------
+    cp /opt/ems/EMSServer/deploy/systemd/ems-collector.service \
+       /etc/systemd/system/ems-collector.service
+    systemctl daemon-reload
+    systemctl enable ems-collector
+
+
+SCHRITT 12 – Collector starten und testen
+-------------------------------------------
+    systemctl start ems-collector
+
+    # Logs verfolgen (Ctrl+C zum Beenden):
+    journalctl -u ems-collector -f
+
+    # Erwartete Ausgabe nach Start:
+    #   Collector gestartet | site=home | poll=10s | agg=900s
+    #   Raw: N Punkte geschrieben
+
+    # Status prüfen:
+    systemctl status ems-collector
+
+
+INSTALLATION PRÜFEN
+--------------------
+    systemctl status ems-collector     # active (running)
+
+    # Daten in InfluxDB prüfen (auf EMSDataUI oder direkt):
+    # InfluxDB UI → http://10.13.30.221:8086
+    # Data Explorer → Bucket: ems_raw → Filter: measurement → Werte sichtbar?
+
+
+UPDATES
+--------
+    # Repository aktualisieren und Service neu starten:
+    git -C /opt/ems/EMSServer pull --ff-only
+    /opt/ems/venv/bin/pip install -r /opt/ems/EMSServer/requirements.txt -q
+    systemctl restart ems-collector
+
+
+NÄCHSTE PHASE
+-------------
+    Phase 2 (Forecast-Service) kann gestartet werden sobald
+    der Collector mindestens 48h Daten gesammelt hat.

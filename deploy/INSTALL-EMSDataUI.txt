@@ -1,0 +1,118 @@
+EMSDataUI – Installationsanleitung (Debian 12 Bookworm)
+=========================================================
+CT: 10.13.30.221
+Services: InfluxDB 2.x, Grafana
+
+VORAUSSETZUNGEN
+---------------
+- Proxmox CT mit Debian 12 (Bookworm) Template
+- Mindestens 2 GB RAM, 20 GB Disk
+- Netzwerk konfiguriert, Internetzugang vorhanden
+- Anmeldung als root im CT (Proxmox-Konsole oder SSH)
+
+
+SCHRITT 1 – System aktualisieren
+---------------------------------
+    apt-get update && apt-get upgrade -y
+
+
+SCHRITT 2 – Basis-Pakete installieren
+--------------------------------------
+    apt-get install -y curl gpg ca-certificates apt-transport-https
+
+
+SCHRITT 3 – InfluxDB 2.x installieren
+--------------------------------------
+    # GPG-Key importieren
+    curl -fsSL https://repos.influxdata.com/influxdata-archive_compat.key \
+        | gpg --dearmor -o /etc/apt/trusted.gpg.d/influxdata.gpg
+
+    # Apt-Quelle hinzufügen
+    echo "deb [signed-by=/etc/apt/trusted.gpg.d/influxdata.gpg] https://repos.influxdata.com/debian stable main" \
+        > /etc/apt/sources.list.d/influxdata.list
+
+    # Installieren und starten
+    apt-get update && apt-get install -y influxdb2
+    systemctl enable --now influxdb
+
+
+SCHRITT 4 – InfluxDB einrichten
+--------------------------------
+    # Prüfen ob InfluxDB läuft
+    influx ping
+    # Erwartete Ausgabe: OK
+
+    # Ersteinrichtung
+    influx setup \
+        --username admin \
+        --password "SICHERES_PASSWORT_WAEHLEN" \
+        --org ems \
+        --bucket ems_raw \
+        --retention 720h \
+        --force
+
+    # All-Access API-Token erzeugen
+    influx auth create \
+        --org ems \
+        --all-access \
+        --description "ems-collector-token"
+    # Den ausgegebenen Token notieren – wird auf EMSCore benötigt!
+
+
+SCHRITT 5 – Grafana installieren
+---------------------------------
+    # GPG-Key importieren
+    curl -fsSL https://apt.grafana.com/gpg.key \
+        | gpg --dearmor -o /etc/apt/trusted.gpg.d/grafana.gpg
+
+    # Apt-Quelle hinzufügen
+    echo "deb [signed-by=/etc/apt/trusted.gpg.d/grafana.gpg] https://apt.grafana.com stable main" \
+        > /etc/apt/sources.list.d/grafana.list
+
+    # Installieren und starten
+    apt-get update && apt-get install -y grafana
+    systemctl enable --now grafana-server
+
+
+SCHRITT 6 – Grafana Grundkonfiguration
+----------------------------------------
+    Browser öffnen: http://10.13.30.221:3000
+    Login: admin / admin  →  Passwort sofort ändern!
+
+    Datasource hinzufügen:
+        Connections → Data Sources → Add → InfluxDB
+        Query Language:  Flux
+        URL:             http://localhost:8086
+        Organization:    ems
+        Token:           (Token aus Schritt 4)
+        Default Bucket:  ems_raw
+        → Save & Test
+
+
+SCHRITT 7 – Firewall (optional, empfohlen)
+-------------------------------------------
+    apt-get install -y ufw
+    ufw allow from 10.13.30.0/24 to any port 8086   # InfluxDB nur intern
+    ufw allow from 10.13.30.0/24 to any port 3000   # Grafana nur intern
+    ufw allow 22
+    ufw --force enable
+
+
+INSTALLATION PRÜFEN
+--------------------
+    systemctl status influxdb       # active (running)
+    systemctl status grafana-server # active (running)
+    influx ping                     # OK
+    curl -s http://localhost:3000/api/health | grep ok
+
+
+ZUGANG
+------
+    InfluxDB:  http://10.13.30.221:8086
+    Grafana:   http://10.13.30.221:3000
+
+
+NÄCHSTER SCHRITT
+----------------
+    EMSCore (10.13.30.220) einrichten – siehe INSTALL-EMSCore.txt
+    Den InfluxDB-Token aus Schritt 4 bereithalten.
