@@ -559,11 +559,20 @@
 
         function renderConsumptionChart(data) {
             const ctx = document.getElementById('consumptionChart').getContext('2d');
-            const hourly = data.consumption_hourly || [];
-            const labels = hourly.map(item => item.label || `${String(item.hour || 0).padStart(2, '0')}:00`);
-            const dhwValues = hourly.map(item => item.dhw_w || 0);
-            const climateValues = hourly.map(item => item.climate_w || 0);
-            const wallboxValues = hourly.map(item => item.wallbox_w || 0);
+            const forecastHourly = data.consumption_hourly || [];
+            const actualHourly = data.consumption_actual_hourly || [];
+            const labelsSource = forecastHourly.length ? forecastHourly : actualHourly;
+            const labels = labelsSource.map(item => item.label || `${String(item.hour || 0).padStart(2, '0')}:00`);
+
+            const actualByHour = new Map(actualHourly.map(item => [item.hour, item]));
+            const dhwActualValues = labelsSource.map(item => (actualByHour.get(item.hour || 0)?.dhw_w) || 0);
+            const climateActualValues = labelsSource.map(item => (actualByHour.get(item.hour || 0)?.climate_w) || 0);
+            const wallboxActualValues = labelsSource.map(item => (actualByHour.get(item.hour || 0)?.wallbox_w) || 0);
+            const houseActualValues = labelsSource.map(item => (actualByHour.get(item.hour || 0)?.house_w) || 0);
+            const forecastTotalValues = labelsSource.map(item => {
+                const src = forecastHourly[item.hour || 0] || forecastHourly.find(h => h.hour === item.hour);
+                return (src?.total_w) || 0;
+            });
 
             if (consumptionChart) {
                 consumptionChart.destroy();
@@ -575,28 +584,57 @@
                     labels,
                     datasets: [
                         {
-                            label: 'Warmwasser',
-                            data: dhwValues,
+                            label: 'IST Haus gesamt',
+                            data: houseActualValues,
+                            backgroundColor: 'rgba(100, 116, 139, 0.25)',
+                            borderColor: 'rgba(71, 85, 105, 0.75)',
+                            borderWidth: 1,
+                            stack: 'house',
+                            order: 5,
+                        },
+                        {
+                            label: 'IST Warmwasser',
+                            data: dhwActualValues,
                             backgroundColor: 'rgba(14, 165, 233, 0.75)',
                             borderColor: 'rgb(14, 165, 233)',
                             borderWidth: 1,
-                            stack: 'consumers',
+                            stack: 'ist_consumers',
+                            order: 4,
                         },
                         {
-                            label: 'Klima',
-                            data: climateValues,
+                            label: 'IST Klima',
+                            data: climateActualValues,
                             backgroundColor: 'rgba(16, 185, 129, 0.75)',
                             borderColor: 'rgb(16, 185, 129)',
                             borderWidth: 1,
-                            stack: 'consumers',
+                            stack: 'ist_consumers',
+                            order: 4,
                         },
                         {
-                            label: 'Wallbox',
-                            data: wallboxValues,
+                            label: 'IST Wallbox',
+                            data: wallboxActualValues,
                             backgroundColor: 'rgba(245, 158, 11, 0.8)',
                             borderColor: 'rgb(245, 158, 11)',
                             borderWidth: 1,
-                            stack: 'consumers',
+                            stack: 'ist_consumers',
+                            order: 4,
+                        },
+                        {
+                            type: 'line',
+                            label: 'Prognose gesamt',
+                            data: forecastTotalValues,
+                            borderColor: 'rgb(30, 64, 175)',
+                            backgroundColor: 'transparent',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.2,
+                            spanGaps: true,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            pointBackgroundColor: 'rgb(30, 64, 175)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 1,
+                            order: 1,
                         }
                     ]
                 },
@@ -618,11 +656,23 @@
                             padding: 12,
                             callbacks: {
                                 label: function(context) {
-                                    return context.dataset.label + ': ' + context.parsed.y.toLocaleString('de-DE') + ' W';
+                                    const value = context.parsed?.y;
+                                    if (typeof value !== 'number') {
+                                        return context.dataset.label + ': -';
+                                    }
+                                    return context.dataset.label + ': ' + value.toLocaleString('de-DE') + ' W';
                                 },
                                 footer: function(items) {
-                                    const total = items.reduce((sum, item) => sum + (item.parsed.y || 0), 0);
-                                    return 'Gesamt: ' + total.toLocaleString('de-DE') + ' W';
+                                    const istConsumer = items
+                                        .filter(item => item.dataset.stack === 'ist_consumers')
+                                        .reduce((sum, item) => sum + (item.parsed?.y || 0), 0);
+                                    const istHouse = items
+                                        .filter(item => item.dataset.stack === 'house')
+                                        .reduce((sum, item) => sum + (item.parsed?.y || 0), 0);
+                                    const prognose = items
+                                        .filter(item => item.dataset.type === 'line')
+                                        .reduce((sum, item) => sum + (item.parsed?.y || 0), 0);
+                                    return `IST Verbraucher: ${istConsumer.toLocaleString('de-DE')} W | IST Haus: ${istHouse.toLocaleString('de-DE')} W | Prognose: ${prognose.toLocaleString('de-DE')} W`;
                                 }
                             }
                         }
