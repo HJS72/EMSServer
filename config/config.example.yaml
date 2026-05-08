@@ -1,0 +1,206 @@
+ems:
+  site: "home"
+
+iobroker:
+  host: "10.13.30.XXX"     # <-- IP des ioBroker-Hosts eintragen
+  port: 8087
+  timeout: 5
+
+influxdb:
+  url: "http://10.13.30.221:8086"
+  token: "__REPLACE_WITH_INFLUX_TOKEN__"   # alternativ: Env-Var EMS_INFLUX_TOKEN
+  org: "ems"
+  bucket_raw: "ems_raw"
+  bucket_agg: "ems_agg"
+  bucket_forecast: "ems_forecast"
+  bucket_control: "ems_control"
+
+sqlite:
+  path: "/var/lib/ems/ems.db"
+
+collector:
+  poll_interval_s: 10
+  agg_interval_s: 900      # 15 Minuten
+
+# ---------------------------------------------------------------------------
+# Datenpunkte aus ioBroker simple-api
+# Alle id-Werte muessen auf vorhandene ioBroker State-IDs angepasst werden.
+# type-Werte: pv | battery | ev | hp | climate | grid | base_load | weather | context
+# writable: true = Dispatcher darf diesen State setzen
+# ---------------------------------------------------------------------------
+datapoints:
+
+  # --- PV-Anlage 1 (ohne Batterie) -----------------------------------------
+  - id: "ADAPTER.INSTANCE.pv1.power_w"
+    alias: "pv1_power"
+    measurement: "power"
+    device_id: "pv1"
+    device_type: "pv"
+    unit: "W"
+
+  - id: "ADAPTER.INSTANCE.pv1.energy_today_wh"
+    alias: "pv1_energy_today"
+    measurement: "energy"
+    device_id: "pv1"
+    device_type: "pv"
+    unit: "Wh"
+
+  # --- PV-Anlage 2 mit Batterie ---------------------------------------------
+  - id: "ADAPTER.INSTANCE.pv2.power_w"
+    alias: "pv2_power"
+    measurement: "power"
+    device_id: "pv2"
+    device_type: "pv"
+    unit: "W"
+
+  - id: "ADAPTER.INSTANCE.pv2.energy_today_wh"
+    alias: "pv2_energy_today"
+    measurement: "energy"
+    device_id: "pv2"
+    device_type: "pv"
+    unit: "Wh"
+
+  # --- Batterie (zu PV2) ---------------------------------------------------
+  - id: "ADAPTER.INSTANCE.battery.soc_percent"
+    alias: "battery_soc"
+    measurement: "soc"
+    device_id: "battery"
+    device_type: "battery"
+    unit: "percent"
+
+  - id: "ADAPTER.INSTANCE.battery.power_w"
+    alias: "battery_power"
+    measurement: "power"
+    device_id: "battery"
+    device_type: "battery"
+    unit: "W"
+
+  - id: "ADAPTER.INSTANCE.battery.charge_setpoint_w"
+    alias: "battery_charge_setpoint"
+    measurement: "setpoint"
+    device_id: "battery"
+    device_type: "battery"
+    unit: "W"
+    writable: true
+
+  # --- Netz ----------------------------------------------------------------
+  - id: "ADAPTER.INSTANCE.grid.power_w"
+    alias: "grid_power"
+    measurement: "power"
+    device_id: "grid"
+    device_type: "grid"
+    unit: "W"
+
+  - id: "ADAPTER.INSTANCE.grid.energy_import_wh"
+    alias: "grid_energy_import"
+    measurement: "energy"
+    device_id: "grid"
+    device_type: "grid"
+    unit: "Wh"
+
+  - id: "ADAPTER.INSTANCE.grid.energy_export_wh"
+    alias: "grid_energy_export"
+    measurement: "energy"
+    device_id: "grid"
+    device_type: "grid"
+    unit: "Wh"
+
+  # --- Gesamtverbrauch Haus ------------------------------------------------
+  - id: "ADAPTER.INSTANCE.house.power_w"
+    alias: "house_power"
+    measurement: "power"
+    device_id: "house"
+    device_type: "base_load"
+    unit: "W"
+
+  # --- EV-Ladepunkt --------------------------------------------------------
+  - id: "ADAPTER.INSTANCE.ev_charger.power_w"
+    alias: "ev_charger_power"
+    measurement: "power"
+    device_id: "ev_charger"
+    device_type: "ev"
+    unit: "W"
+
+  - id: "ADAPTER.INSTANCE.ev_charger.max_current_a"
+    alias: "ev_charger_max_current"
+    measurement: "setpoint"
+    device_id: "ev_charger"
+    device_type: "ev"
+    unit: "A"
+    writable: true
+
+  - id: "ADAPTER.INSTANCE.ev.soc_percent"
+    alias: "ev_soc"
+    measurement: "soc"
+    device_id: "ev"
+    device_type: "ev"
+    unit: "percent"
+
+  # --- Brauchwasserwaermepumpe (WWP) ----------------------------------------
+  - id: "ADAPTER.INSTANCE.wwp.power_w"
+    alias: "wwp_power"
+    measurement: "power"
+    device_id: "wwp"
+    device_type: "hp"
+    unit: "W"
+
+  - id: "ADAPTER.INSTANCE.wwp.temp_c"
+    alias: "wwp_temp"
+    measurement: "temperature"
+    device_id: "wwp"
+    device_type: "hp"
+    unit: "degC"
+
+  - id: "ADAPTER.INSTANCE.wwp.enabled"
+    alias: "wwp_enabled"
+    measurement: "state"
+    device_id: "wwp"
+    device_type: "hp"
+    unit: "bool"
+    writable: true
+
+  # --- Klimaanlage Schlafzimmer --------------------------------------------
+  - id: "ADAPTER.INSTANCE.climate_bedroom.power_w"
+    alias: "climate_power"
+    measurement: "power"
+    device_id: "climate_bedroom"
+    device_type: "climate"
+    unit: "W"
+
+  - id: "ADAPTER.INSTANCE.climate_bedroom.enabled"
+    alias: "climate_enabled"
+    measurement: "state"
+    device_id: "climate_bedroom"
+    device_type: "climate"
+    unit: "bool"
+    writable: true
+
+  # --- Wetter (Datenpunkte aus ioBroker, z. B. daswetter-Adapter) ----------
+  - id: "ADAPTER.INSTANCE.weather.temp_outside_c"
+    alias: "temp_outside"
+    measurement: "weather"
+    device_id: "weather"
+    device_type: "weather"
+    unit: "degC"
+
+  - id: "ADAPTER.INSTANCE.weather.cloud_cover_percent"
+    alias: "cloud_cover"
+    measurement: "weather"
+    device_id: "weather"
+    device_type: "weather"
+    unit: "percent"
+
+  - id: "ADAPTER.INSTANCE.weather.solar_radiation_wm2"
+    alias: "solar_radiation"
+    measurement: "weather"
+    device_id: "weather"
+    device_type: "weather"
+    unit: "W/m2"
+
+  # --- Kalender/Kontext (z. B. ical2-Adapter oder eigene Skripte) ----------
+  - id: "ADAPTER.INSTANCE.calendar.is_holiday"
+    alias: "is_holiday"
+    measurement: "context"
+    device_id: "calendar"
+    device_type: "context"
+    unit: "bool"

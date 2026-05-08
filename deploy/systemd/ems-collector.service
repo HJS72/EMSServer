@@ -1,0 +1,20 @@
+[Unit]
+Description=EMS Collector Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ems
+WorkingDirectory=/opt/ems/EMSServer
+Environment=PYTHONPATH=/opt/ems/EMSServer
+Environment=EMS_CONFIG=/etc/ems/config.yaml
+EnvironmentFile=-/etc/ems/secrets.env
+ExecStart=/opt/ems/venv/bin/python -m services.collector.main
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

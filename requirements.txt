@@ -1,0 +1,21 @@
+# Shared
+pydantic>=2.7
+pyyaml>=6.0
+
+# Collector (Phase 1)
+httpx>=0.27
+influxdb-client>=1.44
+
+# Forecast (Phase 2 - kommentiert bis Phase 2)
+# lightgbm>=4.3
+# scikit-learn>=1.5
+# requests>=2.32
+# openmeteo-requests>=1.2
+
+# Optimizer (Phase 3)
+# scipy>=1.13
+
+# API/UI (Phase 4)
+# fastapi>=0.111
+# uvicorn[standard]>=0.30
+# jinja2>=3.1
