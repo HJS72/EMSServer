@@ -12,6 +12,9 @@ class DeviceType(str, Enum):
     GRID = "grid"           # Stromnetz
     PRODUCER = "producer"   # Erzeuger (PV, Wind, etc.)
     CONSUMER = "consumer"   # Verbraucher (Last, Wärmepumpe, etc.)
+    DHW = "dhw"             # Brauchwasser-Waermepumpe / Warmwasser
+    CLIMATE = "climate"     # Klimaanlage / Raumkuehlung
+    WALLBOX = "wallbox"     # Wallbox / EV-Ladepunkt
     BATTERY = "battery"     # Speicher
     HYBRID = "hybrid"       # Hybrid-Wechselrichter mit integrierter Batterie
     EV = "ev"               # Elektrofahrzeug
@@ -120,6 +123,178 @@ DEVICE_TEMPLATES = {
                 unit="W",
                 writable=False,
                 required=True,
+            ),
+            "energy_today": MeasurementMapping(
+                name="Tagesenergie",
+                iobroker_id="",
+                unit="kWh",
+                writable=False,
+                required=False,
+            ),
+        },
+    },
+    DeviceType.DHW: {
+        "name": "Brauchwasser-Waermepumpe",
+        "description": "Steuerbarer Warmwasser-Verbraucher mit Temperaturfenster und Freigabe.",
+        "measurements": {
+            "power": MeasurementMapping(
+                name="Leistung",
+                iobroker_id="",
+                unit="W",
+                writable=False,
+                required=True,
+            ),
+            "temp_water": MeasurementMapping(
+                name="Warmwassertemperatur",
+                iobroker_id="",
+                unit="°C",
+                writable=False,
+                required=True,
+            ),
+            "enabled": MeasurementMapping(
+                name="Freigabe EIN/AUS",
+                iobroker_id="",
+                unit="bool",
+                writable=True,
+                required=False,
+            ),
+            "temp_min": MeasurementMapping(
+                name="Temperatur Minimum",
+                iobroker_id="",
+                unit="°C",
+                writable=False,
+                required=False,
+            ),
+            "temp_max": MeasurementMapping(
+                name="Temperatur Maximum",
+                iobroker_id="",
+                unit="°C",
+                writable=False,
+                required=False,
+            ),
+            "windows": MeasurementMapping(
+                name="Geplante Laufzeiten",
+                iobroker_id="",
+                unit="json",
+                writable=False,
+                required=False,
+            ),
+            "energy_today": MeasurementMapping(
+                name="Tagesenergie",
+                iobroker_id="",
+                unit="kWh",
+                writable=False,
+                required=False,
+            ),
+        },
+    },
+    DeviceType.CLIMATE: {
+        "name": "Klimaanlage / Kuehlung",
+        "description": "Steuerbarer Verbraucher fuer Kuehlung mit Temperaturfenster und Freigabe.",
+        "measurements": {
+            "power": MeasurementMapping(
+                name="Leistung",
+                iobroker_id="",
+                unit="W",
+                writable=False,
+                required=True,
+            ),
+            "temp_room": MeasurementMapping(
+                name="Raumtemperatur",
+                iobroker_id="",
+                unit="°C",
+                writable=False,
+                required=True,
+            ),
+            "enabled": MeasurementMapping(
+                name="Freigabe EIN/AUS",
+                iobroker_id="",
+                unit="bool",
+                writable=True,
+                required=False,
+            ),
+            "temp_min": MeasurementMapping(
+                name="Temperatur Minimum",
+                iobroker_id="",
+                unit="°C",
+                writable=False,
+                required=False,
+            ),
+            "temp_max": MeasurementMapping(
+                name="Temperatur Maximum",
+                iobroker_id="",
+                unit="°C",
+                writable=False,
+                required=False,
+            ),
+            "windows": MeasurementMapping(
+                name="Geplante Laufzeiten",
+                iobroker_id="",
+                unit="json",
+                writable=False,
+                required=False,
+            ),
+            "energy_today": MeasurementMapping(
+                name="Tagesenergie",
+                iobroker_id="",
+                unit="kWh",
+                writable=False,
+                required=False,
+            ),
+        },
+    },
+    DeviceType.WALLBOX: {
+        "name": "Wallbox / EV-Ladepunkt",
+        "description": "Steuerbarer Ladepunkt mit Auto-Modus, Ladeleistung und SoC-Bezug.",
+        "measurements": {
+            "charging_power": MeasurementMapping(
+                name="Ladeleistung",
+                iobroker_id="",
+                unit="W",
+                writable=False,
+                required=True,
+            ),
+            "vehicle_soc": MeasurementMapping(
+                name="Fahrzeug SoC",
+                iobroker_id="",
+                unit="%",
+                writable=False,
+                required=True,
+            ),
+            "auto_mode": MeasurementMapping(
+                name="Auto-Modus",
+                iobroker_id="",
+                unit="bool",
+                writable=True,
+                required=False,
+            ),
+            "enabled": MeasurementMapping(
+                name="Freigabe EIN/AUS",
+                iobroker_id="",
+                unit="bool",
+                writable=True,
+                required=False,
+            ),
+            "power_setpoint": MeasurementMapping(
+                name="Ladeleistung Sollwert",
+                iobroker_id="",
+                unit="W",
+                writable=True,
+                required=False,
+            ),
+            "phase_mode": MeasurementMapping(
+                name="Phasenmodus",
+                iobroker_id="",
+                unit="text",
+                writable=False,
+                required=False,
+            ),
+            "plan": MeasurementMapping(
+                name="Ladeplan / Status",
+                iobroker_id="",
+                unit="json",
+                writable=False,
+                required=False,
             ),
             "energy_today": MeasurementMapping(
                 name="Tagesenergie",
