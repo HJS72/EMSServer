@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import re
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -530,6 +531,93 @@ def save_control_config_endpoint():
     except Exception as e:
         logger.error(f"Fehler beim Speichern der Steuer-Konfiguration: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# FORECAST DASHBOARD
+# ============================================================================
+
+@app.route("/dashboard", methods=["GET"])
+def dashboard():
+    """Lade Dashboard HTML."""
+    dashboard_path = Path(__file__).parent / "dashboard.html"
+    if dashboard_path.exists():
+        return send_from_directory(Path(__file__).parent, "dashboard.html")
+    return "Dashboard not found", 404
+
+
+@app.route("/api/forecast/daily", methods=["GET"])
+def get_forecast_daily():
+    """Liefert Tages-Forecast + historische PV-Messwerte für Dashboard."""
+    try:
+        # Lade aktuelle Forecast
+        forecast_file = Path("/etc/ems/latest_forecast.json")
+        if not forecast_file.exists():
+            return jsonify({"error": "Forecast not found"}), 404
+        
+        with open(forecast_file) as f:
+            forecast_data = json.load(f)
+        
+        # Hole ioBroker-States für aktuelle PV-Leistung
+        states = get_iobroker_states_sync()
+        
+        # Suche PV-Leistungs-State (konfigurierbar, standard: modbus.0.pv_power)
+        pv_state_id = "modbus.0.pv_power"
+        current_pv_w = 0
+        if states.get(pv_state_id):
+            state_data = states[pv_state_id]
+            if isinstance(state_data, dict):
+                current_pv_w = state_data.get("val", 0)
+        
+        # Hole History aus ioBroker (sofern History-Plugin aktiv)
+        # Hinweis: Das ist optional; wenn kein History verfügbar, nur aktuelle Werte
+        history_points = _get_pv_history_from_iobroker(pv_state_id, states)
+        
+        # Formatiere Forecast-Slots für Frontend
+        forecast_slots = []
+        for slot in forecast_data.get("slots", []):
+            forecast_slots.append({
+                "ts": slot.get("ts"),
+                "pv_w": slot.get("pv_w"),  # kalibierte PV-Prognose
+                "surplus_w": slot.get("surplus_w"),
+            })
+        
+        response = {
+            "provider": forecast_data.get("provider"),
+            "generated_at": forecast_data.get("generated_at"),
+            "pv_systems": forecast_data.get("pv_systems", []),
+            "forecast_slots": forecast_slots,
+            "current_pv_w": current_pv_w,
+            "history": history_points,  # [{"ts": "...", "pv_w": ...}, ...]
+            "model": forecast_data.get("model"),  # Kalibrierungsmodell
+        }
+        
+        return jsonify(response)
+    
+    except Exception as e:
+        logger.error(f"Fehler bei Forecast-Daily-Endpoint: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+def _get_pv_history_from_iobroker(pv_state_id: str, states: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Versuche, PV-Historien aus ioBroker zu laden.
+    Fallback: Returne leere Liste, wenn kein History-Plugin aktiv.
+    """
+    history = []
+    try:
+        # Wenn History-Plugin aktiv, gibt es einen state history.pv_power
+        # Das ist optional und hängt von der ioBroker-Konfiguration ab
+        history_state_id = f"history.0.{pv_state_id}"
+        
+        # Hier würde man einen weiteren HTTP-Call zu ioBroker machen
+        # für den Historien-API, z.B. /history
+        # Placeholder: Einfach leere Liste, da wir keinen direkten History-Zugriff haben
+        pass
+    except Exception as e:
+        logger.debug(f"Kein History verfügbar: {e}")
+    
+    return history
 
 
 # ============================================================================

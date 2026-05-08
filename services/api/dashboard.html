@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EMS Dashboard - PV Forecast</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            color: #333;
+            margin: 0;
+        }
+        
+        .header-info {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #999;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .info-value.current-pv {
+            color: #f59e0b;
+            font-size: 20px;
+        }
+        
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .metric-card.pv {
+            border-left-color: #f59e0b;
+        }
+        
+        .metric-card.surplus {
+            border-left-color: #10b981;
+        }
+        
+        .metric-card.model {
+            border-left-color: #8b5cf6;
+        }
+        
+        .metric-card h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        .metric-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .metric-card .unit {
+            font-size: 12px;
+            color: #999;
+            margin-left: 4px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .pv-systems-list {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .pv-system-tag {
+            background: #f0f9ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .pv-system-tag.hoymiles {
+            border-color: #fed7aa;
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .pv-system-tag.solaredge {
+            border-color: #a7f3d0;
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-badge.ok {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-badge.updating {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #f0f0f0;
+            color: #999;
+            font-size: 12px;
+        }
+        
+        .error-message {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #dc2626;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>☀️ PV Forecast Dashboard</h1>
+            <div class="header-info">
+                <div class="info-item">
+                    <span class="info-label">Aktuelle Leistung</span>
+                    <span class="info-value current-pv" id="current-pv">-- W</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Status</span>
+                    <span id="status-badge" class="status-badge updating">Loading...</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="error-container"></div>
+        
+        <div class="metrics-row" id="metrics-container">
+            <div class="loading">
+                <div class="spinner"></div>
+                <span>Lade Dashboard...</span>
+            </div>
+        </div>
+        
+        <div id="pv-systems-container" style="margin-bottom: 20px;"></div>
+        
+        <div class="chart-container">
+            <div class="chart-title">Tagesverlauf: Prognostizierte vs. aktuelle PV-Leistung</div>
+            <canvas id="forecastChart"></canvas>
+        </div>
+        
+        <div class="footer">
+            <p>Daten von Open-Meteo · Kalibrierung mit historischen Messwerten · Aktualisiert alle 15 Minuten</p>
+        </div>
+    </div>
+
+    <script>
+        let chart = null;
+
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/forecast/daily');
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Update Metriken
+                updateMetrics(data);
+                
+                // Render Chart
+                renderForecastChart(data);
+                
+                // Update PV-Systeme
+                updatePVSystems(data);
+                
+                // Status
+                document.getElementById('status-badge').className = 'status-badge ok';
+                document.getElementById('status-badge').textContent = '✓ Aktiv';
+                
+            } catch (error) {
+                console.error('Dashboard load error:', error);
+                showError(`Fehler beim Laden des Dashboards: ${error.message}`);
+                document.getElementById('status-badge').className = 'status-badge';
+                document.getElementById('status-badge').textContent = '⚠ Fehler';
+            }
+        }
+
+        function updateMetrics(data) {
+            const container = document.getElementById('metrics-container');
+            const currentPV = data.current_pv_w || 0;
+            const model = data.model || {};
+            
+            // Durchschnittliche Prognose aus den nächsten Slots
+            let avgForecast = 0;
+            let maxForecast = 0;
+            if (data.forecast_slots && data.forecast_slots.length > 0) {
+                const values = data.forecast_slots.map(s => s.pv_w || 0);
+                avgForecast = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+                maxForecast = Math.max(...values);
+            }
+            
+            const metricsHTML = `
+                <div class="metric-card pv">
+                    <h3>Aktuelle PV-Leistung</h3>
+                    <div class="value">${currentPV.toLocaleString('de-DE')} <span class="unit">W</span></div>
+                </div>
+                <div class="metric-card">
+                    <h3>Ø Prognose (heute)</h3>
+                    <div class="value">${avgForecast.toLocaleString('de-DE')} <span class="unit">W</span></div>
+                </div>
+                <div class="metric-card">
+                    <h3>Max Prognose</h3>
+                    <div class="value">${maxForecast.toLocaleString('de-DE')} <span class="unit">W</span></div>
+                </div>
+                <div class="metric-card model">
+                    <h3>Kalibrierung</h3>
+                    <div class="value">${model.samples || 0} <span class="unit">Samples</span></div>
+                    <div style="font-size: 12px; color: #666; margin-top: 8px;">
+                        gain: ${(model.gain || 0).toFixed(3)}<br>
+                        bias: ${(model.bias || 0).toFixed(1)}
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = metricsHTML;
+            document.getElementById('current-pv').textContent = `${currentPV.toLocaleString('de-DE')} W`;
+        }
+
+        function updatePVSystems(data) {
+            const container = document.getElementById('pv-systems-container');
+            if (!data.pv_systems || data.pv_systems.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            const systemsHTML = data.pv_systems
+                .map(sys => {
+                    const className = sys.toLowerCase().includes('hoy') ? 'hoymiles' :
+                                    sys.toLowerCase().includes('solar') ? 'solaredge' : '';
+                    return `<span class="pv-system-tag ${className}">${sys}</span>`;
+                })
+                .join('');
+            
+            container.innerHTML = `
+                <div class="chart-title" style="margin-bottom: 10px; font-size: 14px;">Anlagesysteme</div>
+                <div class="pv-systems-list">${systemsHTML}</div>
+            `;
+        }
+
+        function renderForecastChart(data) {
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+            
+            // Vorbereite Daten
+            const slots = data.forecast_slots || [];
+            const labels = slots.map(s => {
+                const date = new Date(s.ts);
+                return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            });
+            
+            const forecastValues = slots.map(s => s.pv_w || 0);
+            
+            // Historische Daten (mockiert für jetzt; später von ioBroker)
+            // In dieser Version zeigen wir nur den aktuellen Punkt
+            const historicLabels = [...labels];
+            const historicValues = new Array(slots.length).fill(null);
+            const currentPV = data.current_pv_w || 0;
+            if (historicValues.length > 0) {
+                historicValues[historicValues.length - 1] = currentPV;
+            }
+            
+            // Zerstöre alten Chart wenn vorhanden
+            if (chart) {
+                chart.destroy();
+            }
+            
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '📊 Prognose',
+                            data: forecastValues,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#3b82f6',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                        },
+                        {
+                            label: '📈 Aktuelle Werte',
+                            data: historicValues,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'transparent',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: '#f59e0b',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: { size: 14, weight: '600' },
+                                color: '#666',
+                                padding: 15,
+                                usePointStyle: true,
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: { size: 14, weight: 'bold' },
+                            bodyFont: { size: 13 },
+                            borderColor: '#ddd',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    let value = context.parsed.y;
+                                    if (value !== null) {
+                                        return context.dataset.label + ': ' + value.toLocaleString('de-DE') + ' W';
+                                    }
+                                    return context.dataset.label + ': -';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: Math.max(...forecastValues) * 1.1 || 1000,
+                            ticks: {
+                                font: { size: 12 },
+                                color: '#999',
+                                callback: function(value) {
+                                    return value.toLocaleString('de-DE') + ' W';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)',
+                                drawBorder: false,
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: { size: 12 },
+                                color: '#999',
+                            },
+                            grid: {
+                                display: false,
+                                drawBorder: false,
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function showError(message) {
+            const container = document.getElementById('error-container');
+            container.innerHTML = `<div class="error-message">${message}</div>`;
+        }
+
+        // Initial load
+        loadDashboard();
+        
+        // Auto-refresh alle 30 Sekunden
+        setInterval(loadDashboard, 30000);
+    </script>
+</body>
+</html>
