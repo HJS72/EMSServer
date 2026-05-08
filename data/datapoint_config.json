@@ -55,7 +55,13 @@
       "battery_capacity_wh_state_key": "",
       "battery_power_sign": "charge_positive",
       "battery_rest_soc_percent": 0.0,
-      "battery_capacity_kwh": 0.0
+      "battery_capacity_kwh": 0.0,
+      "forecast_enabled": false,
+      "forecast_lat": null,
+      "forecast_lon": null,
+      "forecast_kwp": null,
+      "forecast_azimuth": null,
+      "forecast_declination": null
     },
     {
       "id": "gen-2",
@@ -74,7 +80,13 @@
       "battery_capacity_wh_state_key": "modbus.0.holdingRegisters.102787_Batt_Rated_Energy",
       "battery_power_sign": "charge_positive",
       "battery_rest_soc_percent": 15.0,
-      "battery_capacity_kwh": 0.0
+      "battery_capacity_kwh": 0.0,
+      "forecast_enabled": false,
+      "forecast_lat": null,
+      "forecast_lon": null,
+      "forecast_kwp": null,
+      "forecast_azimuth": null,
+      "forecast_declination": null
     }
   ],
   "grid": {
