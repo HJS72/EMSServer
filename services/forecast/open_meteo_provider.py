@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlencode
 from urllib.request import urlopen
+from zoneinfo import ZoneInfo
 
 
 @dataclass
@@ -43,12 +44,13 @@ def _now_utc() -> datetime:
     return datetime.now(UTC)
 
 
-def _parse_ts(ts: str) -> datetime:
+def _parse_ts(ts: str, naive_tz: Optional[ZoneInfo] = None) -> datetime:
     if ts.endswith("Z"):
         return datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(UTC)
     parsed = datetime.fromisoformat(ts)
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=UTC)
+        base_tz = naive_tz or UTC
+        return parsed.replace(tzinfo=base_tz).astimezone(UTC)
     return parsed.astimezone(UTC)
 
 
@@ -278,6 +280,10 @@ def build_surplus_slots(
     now_utc = now or _now_utc()
     calibrator = LinearCalibrator(cfg.model_path)
     history = _load_history(cfg.history_path)
+    try:
+        local_tz = ZoneInfo(cfg.timezone)
+    except Exception:
+        local_tz = UTC
 
     # Learn from the latest matured forecast slot if current actual is available.
     if actual_pv_w is not None:
@@ -301,7 +307,9 @@ def build_surplus_slots(
 
         for ts, gti, temp in zip(times, gti_list, temp_list):
             try:
-                dt = _parse_ts(ts)
+                # Open-Meteo liefert bei timezone=Europe/Berlin lokale Zeit ohne Offset.
+                # Diese muss als lokale Zeit interpretiert und nach UTC umgerechnet werden.
+                dt = _parse_ts(ts, naive_tz=local_tz)
                 if dt < now_utc:
                     continue
                 gti_v = float(gti)
