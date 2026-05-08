@@ -3,12 +3,22 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlencode
 from urllib.request import urlopen
+
+
+@dataclass
+class PVSystemConfig:
+    name: str
+    pv_kwp: float
+    panel_tilt_deg: float
+    panel_azimuth_deg: float
+    system_efficiency: Optional[float] = None
+    temp_coeff_per_deg: Optional[float] = None
 
 
 @dataclass
@@ -26,6 +36,7 @@ class OpenMeteoConfig:
     min_surplus_w: float = 0.0
     model_path: str = "/var/lib/ems/open_meteo_model.json"
     history_path: str = "/var/lib/ems/open_meteo_history.json"
+    pv_systems: List[PVSystemConfig] = field(default_factory=list)
 
 
 def _now_utc() -> datetime:
@@ -121,24 +132,66 @@ def load_config(raw: Dict[str, Any]) -> OpenMeteoConfig:
     missing = [key for key in required if key not in raw]
     if missing:
         raise ValueError(f"missing config keys: {', '.join(missing)}")
-    return OpenMeteoConfig(**raw)
+    normalized = dict(raw)
+
+    systems_raw = raw.get("pv_systems")
+    pv_systems: List[PVSystemConfig] = []
+    if isinstance(systems_raw, list) and systems_raw:
+        for idx, item in enumerate(systems_raw):
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or f"pv{idx + 1}")
+            pv_systems.append(
+                PVSystemConfig(
+                    name=name,
+                    pv_kwp=float(item.get("pv_kwp", 0.0)),
+                    panel_tilt_deg=float(item.get("panel_tilt_deg", 35.0)),
+                    panel_azimuth_deg=float(item.get("panel_azimuth_deg", 0.0)),
+                    system_efficiency=(
+                        float(item["system_efficiency"])
+                        if item.get("system_efficiency") is not None
+                        else None
+                    ),
+                    temp_coeff_per_deg=(
+                        float(item["temp_coeff_per_deg"])
+                        if item.get("temp_coeff_per_deg") is not None
+                        else None
+                    ),
+                )
+            )
+
+    if not pv_systems:
+        # Backward compatible single-system mode.
+        pv_systems = [
+            PVSystemConfig(
+                name="pv1",
+                pv_kwp=float(raw.get("pv_kwp", 10.0)),
+                panel_tilt_deg=float(raw.get("panel_tilt_deg", 35.0)),
+                panel_azimuth_deg=float(raw.get("panel_azimuth_deg", 0.0)),
+                system_efficiency=float(raw.get("system_efficiency", 0.93)),
+                temp_coeff_per_deg=float(raw.get("temp_coeff_per_deg", -0.004)),
+            )
+        ]
+
+    normalized["pv_systems"] = pv_systems
+    return OpenMeteoConfig(**normalized)
 
 
-def _build_open_meteo_url(cfg: OpenMeteoConfig) -> str:
+def _build_open_meteo_url(cfg: OpenMeteoConfig, pv_system: PVSystemConfig) -> str:
     params = {
         "latitude": cfg.latitude,
         "longitude": cfg.longitude,
         "timezone": cfg.timezone,
         "forecast_days": cfg.forecast_days,
         "minutely_15": "global_tilted_irradiance,temperature_2m",
-        "tilt": cfg.panel_tilt_deg,
-        "azimuth": cfg.panel_azimuth_deg,
+        "tilt": pv_system.panel_tilt_deg,
+        "azimuth": pv_system.panel_azimuth_deg,
     }
     return f"https://api.open-meteo.com/v1/forecast?{urlencode(params)}"
 
 
-def _fetch_open_meteo(cfg: OpenMeteoConfig) -> Dict[str, Any]:
-    url = _build_open_meteo_url(cfg)
+def _fetch_open_meteo(cfg: OpenMeteoConfig, pv_system: PVSystemConfig) -> Dict[str, Any]:
+    url = _build_open_meteo_url(cfg, pv_system)
     with urlopen(url, timeout=20) as resp:
         payload = resp.read().decode("utf-8", errors="replace")
     data = json.loads(payload)
@@ -147,11 +200,22 @@ def _fetch_open_meteo(cfg: OpenMeteoConfig) -> Dict[str, Any]:
     return data
 
 
-def _pv_from_gti_temp(cfg: OpenMeteoConfig, gti_wm2: float, temp_c: float) -> float:
+def _pv_from_gti_temp(
+    cfg: OpenMeteoConfig,
+    pv_system: PVSystemConfig,
+    gti_wm2: float,
+    temp_c: float,
+) -> float:
+    eff = pv_system.system_efficiency if pv_system.system_efficiency is not None else cfg.system_efficiency
+    temp_coeff = (
+        pv_system.temp_coeff_per_deg
+        if pv_system.temp_coeff_per_deg is not None
+        else cfg.temp_coeff_per_deg
+    )
     irr_factor = max(0.0, gti_wm2) / 1000.0
-    temp_factor = 1.0 + cfg.temp_coeff_per_deg * (temp_c - 25.0)
+    temp_factor = 1.0 + temp_coeff * (temp_c - 25.0)
     temp_factor = max(0.5, min(1.2, temp_factor))
-    return max(0.0, cfg.pv_kwp * 1000.0 * irr_factor * temp_factor * cfg.system_efficiency)
+    return max(0.0, pv_system.pv_kwp * 1000.0 * irr_factor * temp_factor * eff)
 
 
 def _load_history(path: str) -> List[Dict[str, Any]]:
@@ -227,26 +291,42 @@ def build_surplus_slots(
             sample["trained_at"] = _to_iso_z(now_utc)
             history[idx] = sample
 
-    data = _fetch_open_meteo(cfg)
-    mm = data.get("minutely_15", {})
-    times = mm.get("time", [])
-    gti_list = mm.get("global_tilted_irradiance", [])
-    temp_list = mm.get("temperature_2m", [])
+    aggregated: Dict[str, Dict[str, float]] = {}
+    for pv_system in cfg.pv_systems:
+        data = _fetch_open_meteo(cfg, pv_system)
+        mm = data.get("minutely_15", {})
+        times = mm.get("time", [])
+        gti_list = mm.get("global_tilted_irradiance", [])
+        temp_list = mm.get("temperature_2m", [])
+
+        for ts, gti, temp in zip(times, gti_list, temp_list):
+            try:
+                dt = _parse_ts(ts)
+                if dt < now_utc:
+                    continue
+                gti_v = float(gti)
+                temp_v = float(temp)
+            except Exception:
+                continue
+
+            raw_part_w = _pv_from_gti_temp(cfg, pv_system, gti_v, temp_v)
+            point = aggregated.setdefault(
+                _to_iso_z(dt),
+                {"raw_pv_w": 0.0, "temp_c": temp_v},
+            )
+            point["raw_pv_w"] += raw_part_w
+            point["temp_c"] = temp_v
 
     slots: List[Dict[str, Any]] = []
     new_history_items: List[Dict[str, Any]] = []
 
-    for ts, gti, temp in zip(times, gti_list, temp_list):
+    for ts in sorted(aggregated.keys()):
         try:
             dt = _parse_ts(ts)
-            if dt < now_utc:
-                continue
-            gti_v = float(gti)
-            temp_v = float(temp)
+            raw_pv_w = float(aggregated[ts]["raw_pv_w"])
         except Exception:
             continue
 
-        raw_pv_w = _pv_from_gti_temp(cfg, gti_v, temp_v)
         calibrated_pv_w = calibrator.apply(raw_pv_w)
         surplus_w = max(cfg.min_surplus_w, calibrated_pv_w - cfg.base_load_w)
 
@@ -289,5 +369,6 @@ def build_surplus_slots(
             "bias": round(calibrator.bias, 3),
             "samples": calibrator.count,
         },
+        "pv_systems": [pv.name for pv in cfg.pv_systems],
         "slots": slots,
     }

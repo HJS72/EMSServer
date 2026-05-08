@@ -28,11 +28,21 @@ Der Generator schreibt standardmaessig nach `/etc/ems/latest_forecast.json` mit 
 }
 ```
 
+### PV-Anlagen pro Konfiguration
+
+Mehrere PV-Anlagen werden ueber `open_meteo.pv_systems` konfiguriert.
+
+- Pro Eintrag: `name`, `pv_kwp`, `panel_tilt_deg`, `panel_azimuth_deg`
+- Optional pro Eintrag: `system_efficiency`, `temp_coeff_per_deg`
+- Die Prognose wird je Anlage berechnet und danach zu einer Gesamtleistung aufsummiert.
+
+Wenn `pv_systems` fehlt, arbeitet der Provider rueckwaertskompatibel mit dem alten Single-Array-Format (`pv_kwp`, `panel_tilt_deg`, `panel_azimuth_deg`).
+
 ### Selbstlernender Teil
 
 Der Provider nutzt ein lineares Online-Modell:
 
-- Rohschaetzung aus GTI + Temperatur -> `pv_w_raw`
+- Rohschaetzung aus GTI + Temperatur (aggregiert ueber alle PV-Anlagen) -> `pv_w_raw`
 - Korrektur: `pv_w = gain * pv_w_raw + bias`
 - Lernen aus Historie: Vergleich von vorigem Forecast-Slot mit aktuellem Ist-PV-Wert aus ioBroker
 
