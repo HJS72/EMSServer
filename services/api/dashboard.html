@@ -483,6 +483,7 @@
             const ctx = document.getElementById('forecastChart').getContext('2d');
             
             const slots = data.forecast_slots || [];
+            const actualSlots = data.actual_slots || [];
             
             // Erstelle 24h Zeitreihe
             const labels = slots.map(s => {
@@ -495,6 +496,7 @@
             });
             
             const forecastValues = slots.map(s => s.pv_w || 0);
+            const actualValues = actualSlots.map(s => s.pv_w ?? null);
             
             if (chart) {
                 chart.destroy();
@@ -516,6 +518,21 @@
                             pointRadius: 3,
                             pointHoverRadius: 6,
                             pointBackgroundColor: '#3b82f6',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                        },
+                        {
+                            label: 'PV IST',
+                            data: actualValues,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'transparent',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.2,
+                            spanGaps: false,
+                            pointRadius: 3,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#f59e0b',
                             pointBorderColor: '#fff',
                             pointBorderWidth: 2,
                         }
@@ -556,7 +573,7 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            max: Math.max(...forecastValues) * 1.1 || 2000,
+                            max: Math.max(...forecastValues, ...actualValues.filter(v => v !== null)) * 1.1 || 2000,
                             ticks: {
                                 font: { size: 12 },
                                 color: '#999',

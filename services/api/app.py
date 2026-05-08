@@ -36,6 +36,7 @@ DEVICES_CONFIG_FILE = Path("/etc/ems/devices.json")  # oder lokal in dev
 CONTROL_CONFIG_FILE = Path("/etc/ems/control_config.json")
 IOBROKER_HOST = "10.13.30.201"  # oder aus env
 IOBROKER_PORT = 8087
+FORECAST_HISTORY_FILE = Path("/var/lib/ems/open_meteo_history.json")
 
 
 # ============================================================================
@@ -585,6 +586,7 @@ def get_forecast_daily():
             "generated_at": forecast_data.get("generated_at"),
             "pv_systems": forecast_data.get("pv_systems", []),
             "forecast_slots": full_slots,
+            "actual_slots": _load_actual_slots_for_date(target_date),
             "current_pv_w": current_pv_w,
             "model": forecast_data.get("model"),
         }
@@ -675,6 +677,53 @@ def _generate_24h_slots(slots: List[Dict[str, Any]], target_date) -> List[Dict[s
                     "surplus_w": 0,
                 })
     
+    return result
+
+
+def _load_actual_slots_for_date(target_date) -> List[Dict[str, Any]]:
+    """Lädt IST-PV-Werte aus der Lernhistorie und richtet sie auf 24h aus."""
+    if not FORECAST_HISTORY_FILE.exists():
+        return _empty_actual_slots(target_date)
+
+    try:
+        data = json.loads(FORECAST_HISTORY_FILE.read_text())
+    except Exception:
+        return _empty_actual_slots(target_date)
+
+    if not isinstance(data, list):
+        return _empty_actual_slots(target_date)
+
+    actual_by_ts: Dict[str, float] = {}
+    prefix = f"{target_date.isoformat()}T"
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        ts = item.get("ts")
+        actual_pv_w = item.get("actual_pv_w")
+        if not isinstance(ts, str) or not ts.startswith(prefix) or actual_pv_w is None:
+            continue
+        try:
+            actual_by_ts[ts] = float(actual_pv_w)
+        except (TypeError, ValueError):
+            continue
+
+    return _empty_actual_slots(target_date, actual_by_ts)
+
+
+def _empty_actual_slots(target_date, actual_by_ts: Optional[Dict[str, float]] = None) -> List[Dict[str, Any]]:
+    """Erzeugt 96 Slots fuer einen Tag; fehlende IST-Werte bleiben null."""
+    from datetime import time
+
+    actual_map = actual_by_ts or {}
+    result: List[Dict[str, Any]] = []
+    for hour in range(24):
+        for minute in [0, 15, 30, 45]:
+            dt = datetime.combine(target_date, time(hour=hour, minute=minute))
+            ts = dt.isoformat() + "Z"
+            result.append({
+                "ts": ts,
+                "pv_w": actual_map.get(ts),
+            })
     return result
 
 
