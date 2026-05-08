@@ -8,6 +8,7 @@ import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 import httpx
 import yaml
@@ -37,6 +38,7 @@ CONTROL_CONFIG_FILE = Path("/etc/ems/control_config.json")
 IOBROKER_HOST = "10.13.30.201"  # oder aus env
 IOBROKER_PORT = 8087
 FORECAST_HISTORY_FILE = Path("/var/lib/ems/open_meteo_history.json")
+DASHBOARD_TIMEZONE = ZoneInfo("Europe/Berlin")
 
 
 # ============================================================================
@@ -626,10 +628,9 @@ def _load_forecast_for_date(target_date) -> Optional[Dict[str, Any]]:
 
 def _forecast_contains_date(forecast_data: Dict[str, Any], target_date) -> bool:
     """Prüft, ob eine Forecast-Datei Slots für das angeforderte Datum enthält."""
-    target_prefix = f"{target_date.isoformat()}T"
     for slot in forecast_data.get("slots", []):
-        ts_str = str(slot.get("ts") or "")
-        if ts_str.startswith(target_prefix):
+        slot_key = _slot_local_key(slot.get("ts"))
+        if slot_key is not None and slot_key[0] == target_date:
             return True
     return False
 
@@ -640,17 +641,13 @@ def _generate_24h_slots(slots: List[Dict[str, Any]], target_date) -> List[Dict[s
     Füllt Lücken mit 0W, wenn Slots nicht verfügbar.
     """
     from datetime import time
-    
-    # Erstelle Map von existierenden Slots nach Timestamp
-    slot_map = {}
+
+    # Erstelle Map nach lokalem Tages-Slot (Datum, Stunde, Minute).
+    slot_map: Dict[tuple, Dict[str, Any]] = {}
     for slot in slots:
-        ts_str = slot.get("ts")
-        if ts_str:
-            try:
-                ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                slot_map[ts] = slot
-            except:
-                pass
+        slot_key = _slot_local_key(slot.get("ts"))
+        if slot_key is not None:
+            slot_map[slot_key] = slot
     
     # Generiere alle 96 Slots für 24h (0:00, 0:15, ..., 23:45)
     result = []
@@ -660,9 +657,9 @@ def _generate_24h_slots(slots: List[Dict[str, Any]], target_date) -> List[Dict[s
                 target_date,
                 time(hour=hour, minute=minute)
             )
-            dt_utc = dt.replace(tzinfo=None)
+            slot_key = (target_date, hour, minute)
             
-            slot = slot_map.get(dt_utc)
+            slot = slot_map.get(slot_key)
             if slot:
                 result.append({
                     "ts": slot["ts"],
@@ -671,8 +668,9 @@ def _generate_24h_slots(slots: List[Dict[str, Any]], target_date) -> List[Dict[s
                 })
             else:
                 # Fülle mit 0W wenn kein Slot vorhanden
+                dt_local = dt.replace(tzinfo=DASHBOARD_TIMEZONE)
                 result.append({
-                    "ts": dt_utc.isoformat() + "Z",
+                    "ts": dt_local.isoformat(),
                     "pv_w": 0,
                     "surplus_w": 0,
                 })
@@ -693,38 +691,49 @@ def _load_actual_slots_for_date(target_date) -> List[Dict[str, Any]]:
     if not isinstance(data, list):
         return _empty_actual_slots(target_date)
 
-    actual_by_ts: Dict[str, float] = {}
-    prefix = f"{target_date.isoformat()}T"
+    actual_by_slot: Dict[tuple, float] = {}
     for item in data:
         if not isinstance(item, dict):
             continue
-        ts = item.get("ts")
+        slot_key = _slot_local_key(item.get("ts"))
         actual_pv_w = item.get("actual_pv_w")
-        if not isinstance(ts, str) or not ts.startswith(prefix) or actual_pv_w is None:
+        if slot_key is None or slot_key[0] != target_date or actual_pv_w is None:
             continue
         try:
-            actual_by_ts[ts] = float(actual_pv_w)
+            actual_by_slot[slot_key] = float(actual_pv_w)
         except (TypeError, ValueError):
             continue
 
-    return _empty_actual_slots(target_date, actual_by_ts)
+    return _empty_actual_slots(target_date, actual_by_slot)
 
 
-def _empty_actual_slots(target_date, actual_by_ts: Optional[Dict[str, float]] = None) -> List[Dict[str, Any]]:
+def _empty_actual_slots(target_date, actual_by_slot: Optional[Dict[tuple, float]] = None) -> List[Dict[str, Any]]:
     """Erzeugt 96 Slots fuer einen Tag; fehlende IST-Werte bleiben null."""
     from datetime import time
 
-    actual_map = actual_by_ts or {}
+    actual_map = actual_by_slot or {}
     result: List[Dict[str, Any]] = []
     for hour in range(24):
         for minute in [0, 15, 30, 45]:
-            dt = datetime.combine(target_date, time(hour=hour, minute=minute))
-            ts = dt.isoformat() + "Z"
+            dt = datetime.combine(target_date, time(hour=hour, minute=minute)).replace(tzinfo=DASHBOARD_TIMEZONE)
+            ts = dt.isoformat()
             result.append({
                 "ts": ts,
-                "pv_w": actual_map.get(ts),
+                "pv_w": actual_map.get((target_date, hour, minute)),
             })
     return result
+
+
+def _slot_local_key(ts_value: Any) -> Optional[tuple]:
+    """Normalisiert einen Timestamp auf (lokales Datum, Stunde, Minute)."""
+    if not isinstance(ts_value, str) or not ts_value:
+        return None
+    try:
+        dt = datetime.fromisoformat(ts_value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    local_dt = dt.astimezone(DASHBOARD_TIMEZONE)
+    return (local_dt.date(), local_dt.hour, local_dt.minute)
 
 
 # ============================================================================
