@@ -41,6 +41,7 @@ IOBROKER_HOST = "10.13.30.201"  # oder aus env
 IOBROKER_PORT = 8087
 FORECAST_HISTORY_FILE = Path("/var/lib/ems/open_meteo_history.json")
 DASHBOARD_TIMEZONE = ZoneInfo("Europe/Berlin")
+FORECAST_CONFIG_FILE = Path("/etc/ems/forecast_config.json")
 
 
 # ============================================================================
@@ -115,6 +116,34 @@ def _coerce_float(value: Any) -> Optional[float]:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _load_forecast_location() -> Dict[str, Any]:
+    """Lädt Forecast-Standortparameter für UI/Visualisierung."""
+    location = {
+        "latitude": None,
+        "longitude": None,
+        "timezone": "Europe/Berlin",
+    }
+    if not FORECAST_CONFIG_FILE.exists():
+        return location
+
+    try:
+        raw = json.loads(FORECAST_CONFIG_FILE.read_text())
+        source = raw.get("open_meteo", raw) if isinstance(raw, dict) else {}
+        lat = _coerce_float(source.get("latitude"))
+        lon = _coerce_float(source.get("longitude"))
+        if lat is not None:
+            location["latitude"] = lat
+        if lon is not None:
+            location["longitude"] = lon
+        tz = source.get("timezone")
+        if isinstance(tz, str) and tz:
+            location["timezone"] = tz
+    except Exception as e:
+        logger.warning(f"Konnte Forecast-Standort nicht laden: {e}")
+
+    return location
 
 
 def _merge_control_devices(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -589,6 +618,7 @@ def get_forecast_daily():
             "date": target_date.isoformat(),
             "provider": forecast_data.get("provider"),
             "generated_at": forecast_data.get("generated_at"),
+            "forecast_location": _load_forecast_location(),
             "forecast_slots": full_slots,
             "actual_slots": _load_actual_slots_for_date(target_date),
             "consumption_hourly": _build_consumption_hourly(full_slots),
