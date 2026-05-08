@@ -113,6 +113,9 @@
         .device-type.grid { background: #e3f2fd; color: #1976d2; }
         .device-type.producer { background: #e8f5e9; color: #388e3c; }
         .device-type.consumer { background: #fff3e0; color: #f57c00; }
+        .device-type.dhw { background: #fff8e1; color: #ef6c00; }
+        .device-type.climate { background: #e0f7fa; color: #00838f; }
+        .device-type.wallbox { background: #e8f5e9; color: #2e7d32; }
         .device-type.battery { background: #f3e5f5; color: #7b1fa2; }
         
         .form-group {
@@ -166,6 +169,11 @@
         .measurement-item:last-child {
             margin-bottom: 0;
         }
+
+        .measurement-item.recommended {
+            border-left-color: #2e7d32;
+            background: #fcfffc;
+        }
         
         .measurement-name {
             font-weight: 600;
@@ -182,6 +190,13 @@
             color: #7b1fa2;
             padding: 2px 6px;
             border-radius: 3px;
+        }
+
+        .measurement-meta {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 6px;
+            line-height: 1.4;
         }
         
         .measurement-field {
@@ -204,6 +219,13 @@
         .measurement-field input {
             padding: 6px;
             font-size: 12px;
+        }
+
+        .state-input-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            align-items: center;
         }
         
         .btn {
@@ -347,6 +369,118 @@
             box-shadow: 0 8px 24px rgba(0,0,0,0.15);
             pointer-events: auto;
         }
+
+        .picker-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(20, 24, 40, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1200;
+            padding: 20px;
+        }
+
+        .picker-modal.open {
+            display: flex;
+        }
+
+        .picker-dialog {
+            background: white;
+            width: min(900px, 100%);
+            max-height: 80vh;
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.18);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .picker-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .picker-title {
+            font-weight: 600;
+            color: #222;
+        }
+
+        .picker-body {
+            padding: 16px 20px 20px;
+            overflow: auto;
+            display: grid;
+            gap: 12px;
+        }
+
+        .tree-browser {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            background: #fafafa;
+        }
+
+        .tree-node {
+            margin-left: 16px;
+        }
+
+        .tree-node details {
+            margin: 4px 0;
+        }
+
+        .tree-node summary {
+            cursor: pointer;
+            color: #334155;
+            font-size: 13px;
+        }
+
+        .tree-leaf {
+            width: 100%;
+            text-align: left;
+            border: 1px solid #e2e8f0;
+            background: white;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin: 6px 0;
+            cursor: pointer;
+        }
+
+        .tree-leaf:hover {
+            border-color: #667eea;
+            background: #eef2ff;
+        }
+
+        .tree-leaf-name {
+            font-size: 13px;
+            color: #111827;
+            font-weight: 600;
+        }
+
+        .tree-leaf-meta {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
+            font-family: monospace;
+        }
+
+        .picker-search {
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 1;
+        }
+
+        .picker-empty {
+            font-size: 13px;
+            color: #777;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
         
         .empty-state {
             text-align: center;
@@ -384,6 +518,23 @@
     </div>
 
     <div id="status-footer" class="status-footer"></div>
+    <div id="picker-modal" class="picker-modal" onclick="closeStatePicker(event)">
+        <div class="picker-dialog" onclick="event.stopPropagation()">
+            <div class="picker-header">
+                <div>
+                    <div class="picker-title" id="picker-title">ioBroker State waehlen</div>
+                    <div style="font-size: 12px; color: #6b7280;">Such- und Auswahlhilfe fuer Messwerte</div>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="closeStatePicker()">Schliessen</button>
+            </div>
+            <div class="picker-body">
+                <div class="picker-search">
+                    <input type="text" id="picker-search-input" placeholder="State-ID oder Name filtern" oninput="renderStatePickerList()">
+                </div>
+                <div id="picker-list" class="tree-browser"></div>
+            </div>
+        </div>
+    </div>
 
     <script>
         const API_BASE = "/api";
@@ -391,6 +542,46 @@
         let allDevices = [];
         let deviceTypes = [];
         let iobrokerStates = [];
+        let pickerMeasurementKey = null;
+
+        const CONTROL_DEVICE_LAYOUTS = {
+            dhw: {
+                title: "Brauchwasser-Waermepumpe",
+                order: ["temp_water", "enabled", "windows", "power", "temp_min", "temp_max", "energy_today"],
+                hints: {
+                    temp_water: "Ist-Temperatur fuer die Fahrplanlogik.",
+                    enabled: "Schaltfreigabe fuer EIN/AUS des Verbrauchers.",
+                    windows: "Rueckkanal fuer geplante Laufzeitfenster.",
+                    power: "Optionaler Istwert fuer Anzeige und Monitoring."
+                },
+                recommended: ["temp_water", "enabled", "windows"]
+            },
+            climate: {
+                title: "Klimaanlage / Kuehlung",
+                order: ["temp_room", "enabled", "windows", "power", "temp_min", "temp_max", "energy_today"],
+                hints: {
+                    temp_room: "Ist-Raumtemperatur fuer die Kuehllogik.",
+                    enabled: "Schaltfreigabe fuer die Klimaanlage.",
+                    windows: "Rueckkanal fuer geplante Kuehlfenster.",
+                    power: "Optionaler Istwert fuer Anzeige und Monitoring."
+                },
+                recommended: ["temp_room", "enabled", "windows"]
+            },
+            wallbox: {
+                title: "Wallbox / EV-Ladepunkt",
+                order: ["vehicle_soc", "auto_mode", "enabled", "plan", "charging_power", "power_setpoint", "phase_mode", "energy_today"],
+                hints: {
+                    vehicle_soc: "Aktueller Fahrzeug-SoC fuer Ladeentscheidung und Zielerreichung.",
+                    auto_mode: "Externes Freigabesignal fuer automatisches Laden.",
+                    enabled: "Schaltfreigabe fuer die Wallbox.",
+                    plan: "Rueckkanal fuer Ladefenster und End-SoC.",
+                    power_setpoint: "Optionaler Sollwert fuer spaetere Leistungsregelung.",
+                    charging_power: "Optionaler Istwert fuer Anzeige und Monitoring.",
+                    phase_mode: "Optionaler Rueckkanal fuer 1p/3p-Status."
+                },
+                recommended: ["vehicle_soc", "auto_mode", "enabled", "plan"]
+            }
+        };
 
         // ====================================================================
         // INIT
@@ -454,7 +645,7 @@
                 <div class="device-item ${currentDevice?.id === device.id ? 'active' : ''}" 
                      onclick="selectDevice('${device.id}')">
                     <div class="device-name">${device.name}</div>
-                    <span class="device-type ${device.type}">${device.type}</span>
+                    <span class="device-type ${device.type}">${getTypeLabel(device.type)}</span>
                 </div>
             `).join("");
         }
@@ -471,6 +662,86 @@
         function showNewDeviceForm() {
             currentDevice = null;
             renderNewDeviceForm();
+        }
+
+        function getDeviceTypeMeta(type) {
+            return CONTROL_DEVICE_LAYOUTS[type] || null;
+        }
+
+        function getTypeLabel(type) {
+            return deviceTypes.find(item => item.id === type)?.name || type;
+        }
+
+        function getOrderedMeasurements(device) {
+            const entries = Object.entries(device.measurements || {});
+            const meta = getDeviceTypeMeta(device.type);
+            if (!meta) {
+                return entries;
+            }
+
+            const indexByKey = new Map(meta.order.map((key, index) => [key, index]));
+            return entries.slice().sort((left, right) => {
+                const leftIndex = indexByKey.has(left[0]) ? indexByKey.get(left[0]) : Number.MAX_SAFE_INTEGER;
+                const rightIndex = indexByKey.has(right[0]) ? indexByKey.get(right[0]) : Number.MAX_SAFE_INTEGER;
+                if (leftIndex !== rightIndex) {
+                    return leftIndex - rightIndex;
+                }
+                return left[1].name.localeCompare(right[1].name, 'de');
+            });
+        }
+
+        function openStatePicker(measurementKey) {
+            pickerMeasurementKey = measurementKey;
+            const title = currentDevice?.measurements?.[measurementKey]?.name || measurementKey;
+            document.getElementById("picker-title").textContent = `ioBroker State waehlen: ${title}`;
+            document.getElementById("picker-search-input").value = currentDevice?.measurements?.[measurementKey]?.iobroker_id || "";
+            document.getElementById("picker-modal").classList.add("open");
+            renderStatePickerList();
+        }
+
+        function closeStatePicker(event) {
+            if (event && event.target && event.target.id !== "picker-modal") {
+                return;
+            }
+            pickerMeasurementKey = null;
+            document.getElementById("picker-modal").classList.remove("open");
+        }
+
+        function selectStateFromPicker(stateId) {
+            if (!currentDevice || !pickerMeasurementKey || !currentDevice.measurements?.[pickerMeasurementKey]) {
+                return;
+            }
+            currentDevice.measurements[pickerMeasurementKey].iobroker_id = stateId;
+            closeStatePicker();
+            renderEditor();
+        }
+
+        function renderStatePickerList() {
+            const container = document.getElementById("picker-list");
+            if (!container) {
+                return;
+            }
+
+            const query = (document.getElementById("picker-search-input")?.value || "").trim().toLowerCase();
+            const filtered = iobrokerStates.filter(state => {
+                if (!query) {
+                    return true;
+                }
+                return (state.id || "").toLowerCase().includes(query)
+                    || String(state.name || "").toLowerCase().includes(query);
+            }).slice(0, 120);
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="picker-empty">Keine passenden States gefunden.</div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(state => `
+                <button type="button" class="tree-leaf" onclick="selectStateFromPicker(${JSON.stringify(String(state.id))})">
+                    <div class="tree-leaf-name">${state.name || state.id}</div>
+                    <div class="tree-leaf-meta">${state.id} | ${state.type || '-'} | ${state.unit || '-'}</div>
+                </button>
+            `).join("");
         }
 
         function renderNewDeviceForm() {
@@ -624,7 +895,7 @@
                     <div class="form-group">
                         <label>Typ</label>
                         <select disabled>
-                            <option selected>${currentDevice.type}</option>
+                            <option selected>${getTypeLabel(currentDevice.type)}</option>
                         </select>
                         <small style="color: #999;">Typ kann nachträglich nicht geändert werden</small>
                     </div>
@@ -635,14 +906,18 @@
                     
                     <div class="form-group">
                         <label>Messwerte</label>
+                        ${getDeviceTypeMeta(currentDevice.type) ? `<div id="type-info" style="background: #f0f7ff; padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 13px;"><strong>${getDeviceTypeMeta(currentDevice.type).title}</strong><br>Die markierten Messwerte sind fuer die Steuerlogik besonders relevant.</div>` : ""}
                         <div class="measurements">
             `;
 
             // Render measurements
-            for (const [key, meas] of Object.entries(currentDevice.measurements || {})) {
+            const typeMeta = getDeviceTypeMeta(currentDevice.type);
+            for (const [key, meas] of getOrderedMeasurements(currentDevice)) {
                 const required = meas.required ? '<span class="measurement-required">erforderlich</span>' : '';
                 const isEnergyMeasurement = key.toLowerCase().includes("energy") || ["wh", "kwh"].includes((meas.unit || "").toLowerCase());
                 const isPowerMeasurement = key.toLowerCase().includes("power");
+                const isRecommended = !!typeMeta?.recommended?.includes(key);
+                const hint = typeMeta?.hints?.[key] || "";
                 const unitControl = isEnergyMeasurement
                     ? `<select onchange="currentDevice.measurements['${key}'].unit = this.value">
                            <option value="Wh" ${meas.unit === 'Wh' ? 'selected' : ''}>Wh</option>
@@ -663,17 +938,21 @@
                        </div>`
                     : "";
                 html += `
-                    <div class="measurement-item">
+                    <div class="measurement-item ${isRecommended ? 'recommended' : ''}">
                         <div class="measurement-name">
                             ${meas.name}
                             ${required}
                         </div>
+                        ${hint ? `<div class="measurement-meta">${hint}</div>` : ""}
                         <div class="measurement-field">
                             <div>
                                 <label>ioBroker State ID</label>
-                                <input type="text" value="${meas.iobroker_id || ''}" 
-                                       onchange="currentDevice.measurements['${key}'].iobroker_id = this.value"
-                                       placeholder="z.B. solaredgemodbus.0.PV_Leistung">
+                                <div class="state-input-row">
+                                    <input type="text" value="${meas.iobroker_id || ''}" 
+                                           onchange="currentDevice.measurements['${key}'].iobroker_id = this.value"
+                                           placeholder="z.B. solaredgemodbus.0.PV_Leistung">
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="openStatePicker('${key}')">Auswaehlen</button>
+                                </div>
                             </div>
                             <div>
                                 <label>Einheit</label>
