@@ -13,6 +13,7 @@ class DeviceType(str, Enum):
     PRODUCER = "producer"   # Erzeuger (PV, Wind, etc.)
     CONSUMER = "consumer"   # Verbraucher (Last, Wärmepumpe, etc.)
     BATTERY = "battery"     # Speicher
+    HYBRID = "hybrid"       # Hybrid-Wechselrichter mit integrierter Batterie
     EV = "ev"               # Elektrofahrzeug
 
 
@@ -153,6 +154,83 @@ DEVICE_TEMPLATES = {
                 unit="W",
                 writable=True,
                 required=False,
+            ),
+        },
+    },
+    DeviceType.HYBRID: {
+        "name": "Hybrid-Wechselrichter mit Batterie",
+        "description": "Ein Gerät mit integrierter PV-Anlage und Batterie-Speicher",
+        "measurements": {
+            # PV-Seite
+            "pv_power": MeasurementMapping(
+                name="PV-Leistung (rein)",
+                iobroker_id="",
+                unit="W",
+                writable=False,
+                required=True,
+                allow_negative=False,
+            ),
+            "pv_energy_today": MeasurementMapping(
+                name="PV-Energie heute",
+                iobroker_id="",
+                unit="kWh",
+                writable=False,
+                required=False,
+            ),
+            "pv_energy_total": MeasurementMapping(
+                name="PV-Energie gesamt",
+                iobroker_id="",
+                unit="kWh",
+                writable=False,
+                required=False,
+            ),
+            # Batterie-Seite
+            "batt_power": MeasurementMapping(
+                name="Batterie Lade-/Entladeleistung (+ L, - E)",
+                iobroker_id="",
+                unit="W",
+                writable=False,
+                required=True,
+                allow_negative=True,
+            ),
+            "batt_soc": MeasurementMapping(
+                name="Batterie SoC (Ladezustand)",
+                iobroker_id="",
+                unit="%",
+                writable=False,
+                required=True,
+            ),
+            "batt_soc_min": MeasurementMapping(
+                name="Batterie SoC min (Konfiguration)",
+                iobroker_id="",
+                unit="%",
+                writable=False,
+                required=False,
+            ),
+            "batt_energy_max": MeasurementMapping(
+                name="Batterie max Energie",
+                iobroker_id="",
+                unit="kWh",
+                writable=False,
+                required=False,
+            ),
+            # Netz-Seite (optional)
+            "grid_power": MeasurementMapping(
+                name="Netzleistung (+ Bezug, - Einspeisung)",
+                iobroker_id="",
+                unit="W",
+                writable=False,
+                required=False,
+                allow_negative=True,
+            ),
+            # Gesamtleistung
+            "total_power": MeasurementMapping(
+                name="Gesamtleistung (AC-Ausgang)",
+                iobroker_id="",
+                unit="W",
+                writable=False,
+                required=False,
+                allow_negative=True,
             ),
         },
     },
