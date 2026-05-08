@@ -336,63 +336,36 @@ async def create_control_plan(payload: ControlPlanRequest) -> ControlPlanRespons
 
     if payload.publish_to_iobroker and results:
         first = results[0]
-        try:
-            if dhw_cfg and dhw_cfg.command_state_id:
+        async def _write_safe(state_id: str, value: Any) -> None:
+            try:
                 ok = await _set_iobroker_value(
                     payload.iobroker_host,
                     payload.iobroker_port,
-                    dhw_cfg.command_state_id,
-                    int(first.dhw_on),
+                    state_id,
+                    value,
                 )
-                writeback["writes"].append({"state_id": dhw_cfg.command_state_id, "ok": ok})
-            if dhw_cfg and dhw_cfg.status_state_id:
-                ok = await _set_iobroker_value(
-                    payload.iobroker_host,
-                    payload.iobroker_port,
-                    dhw_cfg.status_state_id,
-                    summary["dhw_windows"],
-                )
-                writeback["writes"].append({"state_id": dhw_cfg.status_state_id, "ok": ok})
+                writeback["writes"].append({"state_id": state_id, "ok": ok})
+            except Exception as exc:
+                writeback["errors"].append(f"{state_id}: {exc}")
 
-            if climate_cfg and climate_cfg.command_state_id:
-                ok = await _set_iobroker_value(
-                    payload.iobroker_host,
-                    payload.iobroker_port,
-                    climate_cfg.command_state_id,
-                    int(first.climate_on),
-                )
-                writeback["writes"].append({"state_id": climate_cfg.command_state_id, "ok": ok})
-            if climate_cfg and climate_cfg.status_state_id:
-                ok = await _set_iobroker_value(
-                    payload.iobroker_host,
-                    payload.iobroker_port,
-                    climate_cfg.status_state_id,
-                    summary["climate_windows"],
-                )
-                writeback["writes"].append({"state_id": climate_cfg.status_state_id, "ok": ok})
+        if dhw_cfg and dhw_cfg.command_state_id:
+            await _write_safe(dhw_cfg.command_state_id, int(first.dhw_on))
+        if dhw_cfg and dhw_cfg.status_state_id:
+            await _write_safe(dhw_cfg.status_state_id, summary["dhw_windows"])
 
-            if wallbox_cfg and wallbox_cfg.command_state_id:
-                ok = await _set_iobroker_value(
-                    payload.iobroker_host,
-                    payload.iobroker_port,
-                    wallbox_cfg.command_state_id,
-                    int(first.wallbox_on),
-                )
-                writeback["writes"].append({"state_id": wallbox_cfg.command_state_id, "ok": ok})
-            if wallbox_cfg and wallbox_cfg.status_state_id:
-                status_payload = {
-                    "windows": summary["wallbox_windows"],
-                    "final_soc_pct": summary["final_wallbox_soc_pct"],
-                }
-                ok = await _set_iobroker_value(
-                    payload.iobroker_host,
-                    payload.iobroker_port,
-                    wallbox_cfg.status_state_id,
-                    status_payload,
-                )
-                writeback["writes"].append({"state_id": wallbox_cfg.status_state_id, "ok": ok})
-        except Exception as exc:
-            writeback["errors"].append(str(exc))
+        if climate_cfg and climate_cfg.command_state_id:
+            await _write_safe(climate_cfg.command_state_id, int(first.climate_on))
+        if climate_cfg and climate_cfg.status_state_id:
+            await _write_safe(climate_cfg.status_state_id, summary["climate_windows"])
+
+        if wallbox_cfg and wallbox_cfg.command_state_id:
+            await _write_safe(wallbox_cfg.command_state_id, int(first.wallbox_on))
+        if wallbox_cfg and wallbox_cfg.status_state_id:
+            status_payload = {
+                "windows": summary["wallbox_windows"],
+                "final_soc_pct": summary["final_wallbox_soc_pct"],
+            }
+            await _write_safe(wallbox_cfg.status_state_id, status_payload)
 
     return ControlPlanResponse(
         interval_minutes=payload.interval_minutes,
