@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import quote
 from typing import Any, Dict, List
 
 import httpx
@@ -23,8 +24,11 @@ class IoBrokerClient:
         """
         if not state_ids:
             return []
-        query = "&".join(state_ids)
-        url = f"{self._base}/getBulk?{query}"
+        # simple-api erwartet /getBulk/<id1,id2,...> statt Query-Parameter.
+        # IDs koennen Sonderzeichen wie '#' enthalten und muessen URL-kodiert sein.
+        joined = ",".join(state_ids)
+        encoded_ids = quote(joined, safe=",")
+        url = f"{self._base}/getBulk/{encoded_ids}"
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.get(url)
             resp.raise_for_status()
