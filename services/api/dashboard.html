@@ -561,6 +561,12 @@
             const ctx = document.getElementById('consumptionChart').getContext('2d');
             const forecastHourly = data.consumption_hourly || [];
             const actualHourly = data.consumption_actual_hourly || [];
+            const consumptionLabels = data.consumption_labels || {};
+            const dhwName = consumptionLabels.dhw || 'Warmwasser';
+            const climateName = consumptionLabels.climate || 'Klima';
+            const wallboxName = consumptionLabels.wallbox || 'Wallbox';
+            const houseName = consumptionLabels.house || 'Haus';
+            const forecastName = consumptionLabels.forecast || 'Prognose';
             const labelsSource = forecastHourly.length ? forecastHourly : actualHourly;
             const labels = labelsSource.map(item => item.label || `${String(item.hour || 0).padStart(2, '0')}:00`);
 
@@ -584,7 +590,7 @@
                     labels,
                     datasets: [
                         {
-                            label: 'IST Haus gesamt',
+                            label: houseName,
                             data: houseActualValues,
                             backgroundColor: 'rgba(100, 116, 139, 0.25)',
                             borderColor: 'rgba(71, 85, 105, 0.75)',
@@ -593,7 +599,7 @@
                             order: 5,
                         },
                         {
-                            label: 'IST Warmwasser',
+                            label: dhwName,
                             data: dhwActualValues,
                             backgroundColor: 'rgba(14, 165, 233, 0.75)',
                             borderColor: 'rgb(14, 165, 233)',
@@ -602,7 +608,7 @@
                             order: 4,
                         },
                         {
-                            label: 'IST Klima',
+                            label: climateName,
                             data: climateActualValues,
                             backgroundColor: 'rgba(16, 185, 129, 0.75)',
                             borderColor: 'rgb(16, 185, 129)',
@@ -611,7 +617,7 @@
                             order: 4,
                         },
                         {
-                            label: 'IST Wallbox',
+                            label: wallboxName,
                             data: wallboxActualValues,
                             backgroundColor: 'rgba(245, 158, 11, 0.8)',
                             borderColor: 'rgb(245, 158, 11)',
@@ -621,7 +627,7 @@
                         },
                         {
                             type: 'line',
-                            label: 'Prognose gesamt',
+                            label: forecastName,
                             data: forecastTotalValues,
                             borderColor: 'rgb(30, 64, 175)',
                             backgroundColor: 'transparent',
@@ -672,7 +678,7 @@
                                     const prognose = items
                                         .filter(item => item.dataset.type === 'line')
                                         .reduce((sum, item) => sum + (item.parsed?.y || 0), 0);
-                                    return `IST Verbraucher: ${istConsumer.toLocaleString('de-DE')} W | IST Haus: ${istHouse.toLocaleString('de-DE')} W | Prognose: ${prognose.toLocaleString('de-DE')} W`;
+                                    return `${dhwName}/${climateName}/${wallboxName}: ${istConsumer.toLocaleString('de-DE')} W | ${houseName}: ${istHouse.toLocaleString('de-DE')} W | ${forecastName}: ${prognose.toLocaleString('de-DE')} W`;
                                 }
                             }
                         }

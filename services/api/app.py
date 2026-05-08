@@ -593,6 +593,7 @@ def get_forecast_daily():
             "actual_slots": _load_actual_slots_for_date(target_date),
             "consumption_hourly": _build_consumption_hourly(full_slots),
             "consumption_actual_hourly": actual_consumption_hourly,
+            "consumption_labels": _get_consumption_labels(),
             "current_pv_w": current_pv_w,
             "model": forecast_data.get("model"),
         }
@@ -817,6 +818,39 @@ def _empty_consumption_hourly() -> List[Dict[str, Any]]:
         }
         for hour in range(24)
     ]
+
+
+def _get_consumption_labels() -> Dict[str, str]:
+    """Liefert Label-Namen für Verbrauchsdiagramm aus der Device-Konfiguration."""
+    labels = {
+        "dhw": "Warmwasser",
+        "climate": "Klima",
+        "wallbox": "Wallbox",
+        "house": "Haus",
+        "forecast": "Prognose",
+    }
+
+    try:
+        devices = [d for d in load_devices_config().devices if d.enabled]
+
+        by_type = {
+            DeviceType.DHW: "dhw",
+            DeviceType.CLIMATE: "climate",
+            DeviceType.WALLBOX: "wallbox",
+        }
+        for device_type, label_key in by_type.items():
+            device = next((d for d in devices if d.type == device_type), None)
+            if device and device.name:
+                labels[label_key] = device.name
+
+        # Haus-Gesamtverbrauch: bevorzugt Device-ID "gesamtverbrauch".
+        house_device = next((d for d in devices if d.id == "gesamtverbrauch"), None)
+        if house_device and house_device.name:
+            labels["house"] = house_device.name
+    except Exception as e:
+        logger.warning(f"Konnte Verbrauchs-Labels nicht aus Devices laden: {e}")
+
+    return labels
 
 
 def _build_actual_consumption_hourly(target_date) -> List[Dict[str, Any]]:
