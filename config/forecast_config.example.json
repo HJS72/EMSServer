@@ -24,5 +24,9 @@
   "archive": {
     "enabled": false,
     "path": "/etc/ems/archive"
+  },
+  "fallback": {
+    "enabled": true,
+    "cache_path": "/var/lib/ems/latest_forecast_ok.json"
   }
 }

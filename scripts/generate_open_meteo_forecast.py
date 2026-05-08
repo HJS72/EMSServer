@@ -60,6 +60,50 @@ def _read_iobroker_value(host: str, port: int, state_id: str) -> Optional[float]
         return None
 
 
+def _load_forecast_file(path: Path) -> Optional[Dict[str, Any]]:
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    slots = data.get("slots")
+    if not isinstance(slots, list) or not slots:
+        return None
+    return data
+
+
+def _load_fallback_forecast(output_path: Path, raw_cfg: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    fallback_cfg = raw_cfg.get("fallback", {})
+    if not isinstance(fallback_cfg, dict):
+        fallback_cfg = {}
+    if not fallback_cfg.get("enabled", True):
+        return None
+
+    candidate_paths = [
+        Path(fallback_cfg.get("cache_path", "/var/lib/ems/latest_forecast_ok.json")),
+        output_path,
+    ]
+    for p in candidate_paths:
+        data = _load_forecast_file(p)
+        if data is not None:
+            return data
+    return None
+
+
+def _mark_fallback(payload: Dict[str, Any], reason: str) -> Dict[str, Any]:
+    out = dict(payload)
+    meta = out.get("meta")
+    if not isinstance(meta, dict):
+        meta = {}
+    meta["fallback_active"] = True
+    meta["fallback_reason"] = reason
+    out["meta"] = meta
+    return out
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate forecast slots from Open-Meteo")
     parser.add_argument("--config", help="path to forecast_config.json")
@@ -86,7 +130,22 @@ def main() -> int:
             except Exception:
                 actual_pv_w = None
 
-    result = build_surplus_slots(cfg, actual_pv_w=actual_pv_w)
+    fallback_cfg = raw.get("fallback", {})
+    if not isinstance(fallback_cfg, dict):
+        fallback_cfg = {}
+    cache_path = Path(fallback_cfg.get("cache_path", "/var/lib/ems/latest_forecast_ok.json"))
+
+    result: Dict[str, Any]
+    try:
+        result = build_surplus_slots(cfg, actual_pv_w=actual_pv_w)
+        # Cache most recent valid forecast for emergency fallback.
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps(result, indent=2))
+    except Exception as exc:
+        fallback = _load_fallback_forecast(output_path, raw)
+        if fallback is None:
+            raise
+        result = _mark_fallback(fallback, reason=f"open-meteo-failed: {exc}")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(result, indent=2))
