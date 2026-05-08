@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -54,6 +55,26 @@ def save_devices_config(config: DeviceConfig) -> None:
         json.dump(config.dict(), f, indent=2)
 
 
+def _slugify(value: str) -> str:
+    """Konvertiert Text in eine stabile ID-kompatible Form."""
+    value = value.strip().lower()
+    value = re.sub(r"[^a-z0-9]+", "_", value)
+    value = re.sub(r"_+", "_", value)
+    return value.strip("_")
+
+
+def generate_device_id(name: str, device_type: str, existing_ids: List[str]) -> str:
+    """Erzeugt automatisch eine eindeutige Device-ID."""
+    base = _slugify(name) or _slugify(device_type) or "device"
+    candidate = base
+    idx = 2
+    existing = set(existing_ids)
+    while candidate in existing:
+        candidate = f"{base}_{idx}"
+        idx += 1
+    return candidate
+
+
 async def get_iobroker_states() -> Dict[str, Any]:
     """Hole alle States von ioBroker getStates API."""
     try:
@@ -75,6 +96,30 @@ def get_iobroker_states_sync() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Fehler bei ioBroker-Abfrage: {e}")
         return {}
+
+
+def build_iobroker_tree(states: Dict[str, Any]) -> Dict[str, Any]:
+    """Baut aus ioBroker State-IDs einen hierarchischen Objektbaum."""
+    root: Dict[str, Any] = {"name": "root", "children": {}, "leaf": False}
+    for state_id, state_data in states.items():
+        parts = state_id.split(".")
+        node = root
+        for part in parts:
+            node["children"].setdefault(
+                part,
+                {"name": part, "children": {}, "leaf": False},
+            )
+            node = node["children"][part]
+
+        node["leaf"] = True
+        node["id"] = state_id
+        if isinstance(state_data, dict):
+            node["val"] = state_data.get("val")
+            common = state_data.get("common", {}) if isinstance(state_data.get("common"), dict) else {}
+            node["unit"] = common.get("unit", "")
+            node["displayName"] = common.get("name", "")
+
+    return root
 
 
 # ============================================================================
@@ -112,10 +157,18 @@ def list_devices():
 def create_device():
     """Neues Device erstellen."""
     try:
-        data = request.json
-        device = Device(**data)
-        
+        data = dict(request.json or {})
         config = load_devices_config()
+
+        if not data.get("id"):
+            data["id"] = generate_device_id(
+                name=data.get("name", "device"),
+                device_type=data.get("type", "device"),
+                existing_ids=[d.id for d in config.devices],
+            )
+
+        device = Device(**data)
+
         # Check für Duplikate
         if any(d.id == device.id for d in config.devices):
             return jsonify({"error": f"Device mit ID '{device.id}' existiert bereits"}), 400
@@ -201,11 +254,19 @@ def get_device_template_endpoint(device_type: str):
     try:
         dt = DeviceType(device_type)
         template = get_device_template(dt)
+        measurements = {
+            key: value.model_dump() if hasattr(value, "model_dump") else value.dict()
+            for key, value in template.get("measurements", {}).items()
+        }
+        serialized_template = {
+            **template,
+            "measurements": measurements,
+        }
         return jsonify({
             "type": device_type,
-            "template": template,
+            "template": serialized_template,
             "required_measurements": [
-                k for k, v in template.get("measurements", {}).items()
+                k for k, v in measurements.items()
                 if v.get("required", True)
             ]
         })
@@ -261,6 +322,18 @@ def search_iobroker():
         return jsonify(result[:100])
     except Exception as e:
         logger.error(f"Fehler bei ioBroker-Suche: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/iobroker/tree", methods=["GET"])
+def iobroker_tree():
+    """Liefert den ioBroker Objektbaum basierend auf State-IDs."""
+    try:
+        states = get_iobroker_states_sync()
+        tree = build_iobroker_tree(states)
+        return jsonify(tree)
+    except Exception as e:
+        logger.error(f"Fehler beim Aufbau des ioBroker-Objektbaums: {e}")
         return jsonify({"error": str(e)}), 500
 
 
