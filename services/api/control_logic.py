@@ -145,7 +145,7 @@ async def _set_iobroker_value(host: str, port: int, state_id: str, value: Any) -
             params={"value": value_str},
         )
         resp.raise_for_status()
-        return "true" in resp.text.lower()
+        return True
 
 
 def _plan_dhw(
@@ -346,6 +346,26 @@ async def create_control_plan(payload: ControlPlanRequest) -> ControlPlanRespons
                 )
                 writeback["writes"].append({"state_id": state_id, "ok": ok})
             except Exception as exc:
+                if isinstance(value, (dict, list)):
+                    # Fallback: falls Ziel-State keinen strukturierten Datentyp akzeptiert,
+                    # schreibe den Inhalt als JSON-String.
+                    try:
+                        ok = await _set_iobroker_value(
+                            payload.iobroker_host,
+                            payload.iobroker_port,
+                            state_id,
+                            json.dumps(value, separators=(",", ":")),
+                        )
+                        writeback["writes"].append({
+                            "state_id": state_id,
+                            "ok": ok,
+                            "fallback": "json-string",
+                        })
+                        return
+                    except Exception as exc2:
+                        writeback["errors"].append(f"{state_id}: {exc2}")
+                        return
+
                 writeback["errors"].append(f"{state_id}: {exc}")
 
         if dhw_cfg and dhw_cfg.command_state_id:
