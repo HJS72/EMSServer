@@ -330,6 +330,23 @@
             color: #2e7d32;
             border-left: 4px solid #4caf50;
         }
+
+        .status-footer {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            padding: 10px 16px;
+            pointer-events: none;
+        }
+
+        .status-footer .message {
+            max-width: 1200px;
+            margin: 0 auto;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            pointer-events: auto;
+        }
         
         .empty-state {
             text-align: center;
@@ -365,6 +382,8 @@
             </div>
         </div>
     </div>
+
+    <div id="status-footer" class="status-footer"></div>
 
     <script>
         const API_BASE = "/api";
@@ -670,11 +689,12 @@
         }
 
         function showMessage(msg, type) {
-            const container = document.querySelector(".main-content");
+            const container = document.getElementById("status-footer");
+            container.innerHTML = "";
             const msgEl = document.createElement("div");
             msgEl.className = `message ${type}`;
             msgEl.textContent = msg;
-            container.insertBefore(msgEl, container.firstChild);
+            container.appendChild(msgEl);
             setTimeout(() => msgEl.remove(), 5000);
         }
 
