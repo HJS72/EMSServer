@@ -133,35 +133,6 @@
             margin-bottom: 15px;
         }
         
-        .pv-systems-list {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        
-        .pv-system-tag {
-            background: #f0f9ff;
-            border: 1px solid #bfdbfe;
-            color: #1e40af;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 500;
-        }
-        
-        .pv-system-tag.hoymiles {
-            border-color: #fed7aa;
-            background: #fef3c7;
-            color: #92400e;
-        }
-        
-        .pv-system-tag.solaredge {
-            border-color: #a7f3d0;
-            background: #d1fae5;
-            color: #065f46;
-        }
-        
         .status-badge {
             display: inline-block;
             padding: 4px 12px;
@@ -298,11 +269,14 @@
             </div>
         </div>
         
-        <div id="pv-systems-container" style="margin-bottom: 20px;"></div>
-        
         <div class="chart-container">
             <div class="chart-title">Tagesverlauf: Prognostizierte vs. aktuelle PV-Leistung (0-24 Uhr)</div>
             <canvas id="forecastChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-title">Verbrauchsprognose: Verbraucher gestackt pro Stunde (0-24 Uhr)</div>
+            <canvas id="consumptionChart"></canvas>
         </div>
         
         <div class="footer">
@@ -312,6 +286,7 @@
 
     <script>
         let chart = null;
+        let consumptionChart = null;
         let currentDate = startOfLocalDay(new Date());
         const MAX_DAYS_AHEAD = 1;
 
@@ -404,7 +379,7 @@
                 
                 updateMetrics(data);
                 renderForecastChart(data);
-                updatePVSystems(data);
+                renderConsumptionChart(data);
                 
                 document.getElementById('status-badge').className = 'status-badge ok';
                 document.getElementById('status-badge').textContent = '✓ Aktiv';
@@ -456,27 +431,6 @@
             
             container.innerHTML = metricsHTML;
             document.getElementById('current-pv').textContent = `${currentPV.toLocaleString('de-DE')} W`;
-        }
-
-        function updatePVSystems(data) {
-            const container = document.getElementById('pv-systems-container');
-            if (!data.pv_systems || data.pv_systems.length === 0) {
-                container.innerHTML = '';
-                return;
-            }
-            
-            const systemsHTML = data.pv_systems
-                .map(sys => {
-                    const className = sys.toLowerCase().includes('hoy') ? 'hoymiles' :
-                                    sys.toLowerCase().includes('solar') ? 'solaredge' : '';
-                    return `<span class="pv-system-tag ${className}">${sys}</span>`;
-                })
-                .join('');
-            
-            container.innerHTML = `
-                <div class="chart-title" style="margin-bottom: 10px; font-size: 14px;">Anlagesysteme</div>
-                <div class="pv-systems-list">${systemsHTML}</div>
-            `;
         }
 
         function renderForecastChart(data) {
@@ -595,6 +549,111 @@
                             },
                             grid: {
                                 display: false,
+                                drawBorder: false,
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderConsumptionChart(data) {
+            const ctx = document.getElementById('consumptionChart').getContext('2d');
+            const hourly = data.consumption_hourly || [];
+            const labels = hourly.map(item => item.label || `${String(item.hour || 0).padStart(2, '0')}:00`);
+            const dhwValues = hourly.map(item => item.dhw_w || 0);
+            const climateValues = hourly.map(item => item.climate_w || 0);
+            const wallboxValues = hourly.map(item => item.wallbox_w || 0);
+
+            if (consumptionChart) {
+                consumptionChart.destroy();
+            }
+
+            consumptionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Warmwasser',
+                            data: dhwValues,
+                            backgroundColor: 'rgba(14, 165, 233, 0.75)',
+                            borderColor: 'rgb(14, 165, 233)',
+                            borderWidth: 1,
+                            stack: 'consumers',
+                        },
+                        {
+                            label: 'Klima',
+                            data: climateValues,
+                            backgroundColor: 'rgba(16, 185, 129, 0.75)',
+                            borderColor: 'rgb(16, 185, 129)',
+                            borderWidth: 1,
+                            stack: 'consumers',
+                        },
+                        {
+                            label: 'Wallbox',
+                            data: wallboxValues,
+                            backgroundColor: 'rgba(245, 158, 11, 0.8)',
+                            borderColor: 'rgb(245, 158, 11)',
+                            borderWidth: 1,
+                            stack: 'consumers',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: { size: 14, weight: '600' },
+                                color: '#666',
+                                padding: 15,
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toLocaleString('de-DE') + ' W';
+                                },
+                                footer: function(items) {
+                                    const total = items.reduce((sum, item) => sum + (item.parsed.y || 0), 0);
+                                    return 'Gesamt: ' + total.toLocaleString('de-DE') + ' W';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            ticks: {
+                                font: { size: 11 },
+                                color: '#999',
+                                maxRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 24,
+                            },
+                            grid: {
+                                display: false,
+                                drawBorder: false,
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                font: { size: 12 },
+                                color: '#999',
+                                callback: function(value) {
+                                    return value.toLocaleString('de-DE') + ' W';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)',
                                 drawBorder: false,
                             }
                         }

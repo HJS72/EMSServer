@@ -586,9 +586,9 @@ def get_forecast_daily():
             "date": target_date.isoformat(),
             "provider": forecast_data.get("provider"),
             "generated_at": forecast_data.get("generated_at"),
-            "pv_systems": forecast_data.get("pv_systems", []),
             "forecast_slots": full_slots,
             "actual_slots": _load_actual_slots_for_date(target_date),
+            "consumption_hourly": _build_consumption_hourly(full_slots),
             "current_pv_w": current_pv_w,
             "model": forecast_data.get("model"),
         }
@@ -734,6 +734,85 @@ def _slot_local_key(ts_value: Any) -> Optional[tuple]:
         return None
     local_dt = dt.astimezone(DASHBOARD_TIMEZONE)
     return (local_dt.date(), local_dt.hour, local_dt.minute)
+
+
+def _build_consumption_hourly(forecast_slots: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Aggregiert den bestehenden Control-Plan auf stündliche, gestackte Verbraucherwerte."""
+    try:
+        base = load_control_config()
+        merged = dict(base)
+        merged["slots"] = [
+            {
+                "ts": slot.get("ts"),
+                "surplus_w": slot.get("surplus_w", 0.0),
+            }
+            for slot in forecast_slots
+        ]
+        merged.setdefault("iobroker_host", IOBROKER_HOST)
+        merged.setdefault("iobroker_port", IOBROKER_PORT)
+        merged["publish_to_iobroker"] = False
+        merged = _merge_control_devices(merged)
+
+        payload = ControlPlanRequest(**merged)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(create_control_plan(payload))
+    except Exception as e:
+        logger.error(f"Fehler beim Erzeugen der Verbrauchsprognose: {e}")
+        return _empty_consumption_hourly()
+
+    hourly: Dict[int, Dict[str, float]] = {
+        hour: {
+            "dhw_w": 0.0,
+            "climate_w": 0.0,
+            "wallbox_w": 0.0,
+        }
+        for hour in range(24)
+    }
+    counts: Dict[int, int] = {hour: 0 for hour in range(24)}
+
+    for slot in result.slots:
+        slot_key = _slot_local_key(slot.ts)
+        if slot_key is None:
+            continue
+        _, hour, _ = slot_key
+        hourly[hour]["dhw_w"] += float(slot.dhw_power_w or 0.0)
+        hourly[hour]["climate_w"] += float(slot.climate_power_w or 0.0)
+        hourly[hour]["wallbox_w"] += float(slot.wallbox_power_w or 0.0)
+        counts[hour] += 1
+
+    result_items: List[Dict[str, Any]] = []
+    for hour in range(24):
+        divisor = counts[hour] or 1
+        dhw_w = round(hourly[hour]["dhw_w"] / divisor, 1)
+        climate_w = round(hourly[hour]["climate_w"] / divisor, 1)
+        wallbox_w = round(hourly[hour]["wallbox_w"] / divisor, 1)
+        result_items.append(
+            {
+                "hour": hour,
+                "label": f"{hour:02d}:00",
+                "dhw_w": dhw_w,
+                "climate_w": climate_w,
+                "wallbox_w": wallbox_w,
+                "total_w": round(dhw_w + climate_w + wallbox_w, 1),
+            }
+        )
+
+    return result_items
+
+
+def _empty_consumption_hourly() -> List[Dict[str, Any]]:
+    return [
+        {
+            "hour": hour,
+            "label": f"{hour:02d}:00",
+            "dhw_w": 0.0,
+            "climate_w": 0.0,
+            "wallbox_w": 0.0,
+            "total_w": 0.0,
+        }
+        for hour in range(24)
+    ]
 
 
 # ============================================================================
