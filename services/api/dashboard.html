@@ -439,15 +439,7 @@
             const slots = data.forecast_slots || [];
             const actualSlots = data.actual_slots || [];
             
-            // Erstelle 24h Zeitreihe
-            const labels = slots.map(s => {
-                try {
-                    const date = new Date(s.ts);
-                    return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                } catch {
-                    return s.ts;
-                }
-            });
+            const labels = slots.map(s => timeLabelFromTs(s.ts));
             
             const forecastValues = slots.map(s => s.pv_w || 0);
             const actualValues = actualSlots.map(s => s.pv_w ?? null);
@@ -587,8 +579,12 @@
                             ticks: {
                                 font: { size: 11 },
                                 color: '#999',
-                                maxRotation: 45,
+                                maxRotation: 0,
                                 minRotation: 0,
+                                callback: function(value) {
+                                    const label = this.getLabelForValue(value);
+                                    return isFullHourLabel(label) ? label : '';
+                                }
                             },
                             grid: {
                                 display: false,
@@ -648,6 +644,7 @@
 
         function renderConsumptionChart(data) {
             const ctx = document.getElementById('consumptionChart').getContext('2d');
+            const slots = data.forecast_slots || [];
             const forecastHourly = data.consumption_hourly || [];
             const actualHourly = data.consumption_actual_hourly || [];
             const consumptionLabels = data.consumption_labels || {};
@@ -657,17 +654,21 @@
             const houseName = consumptionLabels.house || 'Haus';
             const forecastName = consumptionLabels.forecast || 'Prognose';
             const labelsSource = forecastHourly.length ? forecastHourly : actualHourly;
-            const labels = labelsSource.map(item => item.label || `${String(item.hour || 0).padStart(2, '0')}:00`);
+            const hasQuarterSlots = slots.length > 0;
+            const axisHours = hasQuarterSlots
+                ? slots.map(s => hourFromTs(s.ts))
+                : labelsSource.map(item => normalizeHour(item.hour));
+            const labels = hasQuarterSlots
+                ? slots.map(s => timeLabelFromTs(s.ts))
+                : labelsSource.map(item => `${String(normalizeHour(item.hour)).padStart(2, '0')}:00`);
 
-            const actualByHour = new Map(actualHourly.map(item => [item.hour, item]));
-            const dhwActualValues = labelsSource.map(item => (actualByHour.get(item.hour || 0)?.dhw_w) || 0);
-            const climateActualValues = labelsSource.map(item => (actualByHour.get(item.hour || 0)?.climate_w) || 0);
-            const wallboxActualValues = labelsSource.map(item => (actualByHour.get(item.hour || 0)?.wallbox_w) || 0);
-            const houseActualValues = labelsSource.map(item => (actualByHour.get(item.hour || 0)?.house_w) || 0);
-            const forecastTotalValues = labelsSource.map(item => {
-                const src = forecastHourly[item.hour || 0] || forecastHourly.find(h => h.hour === item.hour);
-                return (src?.total_w) || 0;
-            });
+            const actualByHour = new Map(actualHourly.map(item => [normalizeHour(item.hour), item]));
+            const forecastByHour = new Map(forecastHourly.map(item => [normalizeHour(item.hour), item]));
+            const dhwActualValues = axisHours.map(hour => (actualByHour.get(hour)?.dhw_w) || 0);
+            const climateActualValues = axisHours.map(hour => (actualByHour.get(hour)?.climate_w) || 0);
+            const wallboxActualValues = axisHours.map(hour => (actualByHour.get(hour)?.wallbox_w) || 0);
+            const houseActualValues = axisHours.map(hour => (actualByHour.get(hour)?.house_w) || 0);
+            const forecastTotalValues = axisHours.map(hour => (forecastByHour.get(hour)?.total_w) || 0);
 
             if (consumptionChart) {
                 consumptionChart.destroy();
@@ -779,8 +780,11 @@
                                 font: { size: 11 },
                                 color: '#999',
                                 maxRotation: 0,
-                                autoSkip: true,
-                                maxTicksLimit: 24,
+                                autoSkip: false,
+                                callback: function(value) {
+                                    const label = this.getLabelForValue(value);
+                                    return isFullHourLabel(label) ? label : '';
+                                }
                             },
                             grid: {
                                 display: false,
@@ -805,6 +809,34 @@
                     }
                 }
             });
+        }
+
+        function normalizeHour(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n)) {
+                return 0;
+            }
+            return Math.max(0, Math.min(23, Math.floor(n)));
+        }
+
+        function hourFromTs(ts) {
+            const d = new Date(ts);
+            if (Number.isNaN(d.getTime())) {
+                return 0;
+            }
+            return d.getHours();
+        }
+
+        function timeLabelFromTs(ts) {
+            const d = new Date(ts);
+            if (Number.isNaN(d.getTime())) {
+                return String(ts || '');
+            }
+            return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function isFullHourLabel(label) {
+            return typeof label === 'string' && label.endsWith(':00');
         }
 
         function showError(message) {
