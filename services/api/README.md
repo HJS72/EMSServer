@@ -103,6 +103,70 @@ http://10.13.30.220:5000/device-manager
 
 - `GET /api/health` - Service Health-Check
 
+### Steuerlogik (Forecast -> Fahrplan)
+
+- `POST /api/control/plan` - Berechnet Empfehlungen fuer steuerbare Verbraucher
+- `GET /api/control/config` - Liest gespeicherte Parameter (WWP, Klima, Wallbox)
+- `PUT /api/control/config` - Speichert Parameter persistent in `/etc/ems/control_config.json`
+
+Hinweis:
+
+- `POST /api/control/plan` verwendet automatisch die gespeicherte Konfiguration.
+- Im Request koennen einzelne Felder ueberschrieben werden (z. B. nur aktuelle Temperaturen oder aktueller EV-SoC).
+
+Beispiel-Request:
+
+```json
+{
+  "interval_minutes": 15,
+  "publish_to_iobroker": true,
+  "slots": [
+    {"ts": "2026-05-08T12:00:00Z", "surplus_w": 1800},
+    {"ts": "2026-05-08T12:15:00Z", "surplus_w": 5200},
+    {"ts": "2026-05-08T12:30:00Z", "surplus_w": 900}
+  ],
+  "dhw": {
+    "enabled": true,
+    "power_w": 1200,
+    "temp_current_c": 46,
+    "temp_min_c": 47,
+    "temp_max_c": 58,
+    "command_state_id": "ems.0.control.dhw.on",
+    "status_state_id": "ems.0.control.dhw.windows"
+  },
+  "climate": {
+    "enabled": true,
+    "power_w": 1000,
+    "temp_current_c": 28,
+    "temp_min_c": 22,
+    "temp_max_c": 26,
+    "command_state_id": "ems.0.control.climate.on",
+    "status_state_id": "ems.0.control.climate.windows"
+  },
+  "wallbox": {
+    "enabled": true,
+    "auto_mode": true,
+    "auto_mode_state_id": "ems.0.wallbox.auto_mode",
+    "min_power_w": 1400,
+    "max_power_w": 22000,
+    "phase_switch_power_w": 4200,
+    "phase_switch_buffer_slots": 1,
+    "vehicle_soc_pct": 35,
+    "vehicle_target_soc_pct": 80,
+    "vehicle_capacity_kwh": 77,
+    "command_state_id": "ems.0.control.wallbox.on",
+    "status_state_id": "ems.0.control.wallbox.plan"
+  }
+}
+```
+
+Antwort enthaelt:
+
+- Slot-fuer-Slot Empfehlung je Geraet
+- Laufzeitfenster je Geraet (wann idealerweise laufen)
+- erwarteten Endzustand (Temperaturen, EV-SoC)
+- optionales Writeback-Ergebnis pro ioBroker State
+
 ## Device-Typen
 
 ### Grid (Stromnetz)

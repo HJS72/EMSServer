@@ -13,6 +13,7 @@ import yaml
 from flask import Flask, jsonify, request, send_from_directory
 from pydantic import ValidationError
 
+from services.api.control_logic import ControlConfig, ControlPlanRequest, create_control_plan
 from shared.device_models import (
     Device,
     DeviceConfig,
@@ -31,6 +32,7 @@ app.config["JSON_SORT_KEYS"] = False
 # ============================================================================
 
 DEVICES_CONFIG_FILE = Path("/etc/ems/devices.json")  # oder lokal in dev
+CONTROL_CONFIG_FILE = Path("/etc/ems/control_config.json")
 IOBROKER_HOST = "10.13.30.201"  # oder aus env
 IOBROKER_PORT = 8087
 
@@ -53,6 +55,35 @@ def save_devices_config(config: DeviceConfig) -> None:
     DEVICES_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(DEVICES_CONFIG_FILE, "w") as f:
         json.dump(config.dict(), f, indent=2)
+
+
+def load_control_config() -> Dict[str, Any]:
+    """Lade persistierte Steuerlogik-Konfiguration."""
+    if CONTROL_CONFIG_FILE.exists():
+        with open(CONTROL_CONFIG_FILE) as f:
+            data = json.load(f)
+            cfg = ControlConfig(**data)
+            return cfg.model_dump(exclude_none=True)
+
+    # Sinnvolle Standardwerte, wenn noch keine Konfiguration vorhanden ist.
+    return ControlConfig(
+        iobroker_host=IOBROKER_HOST,
+        iobroker_port=IOBROKER_PORT,
+    ).model_dump(exclude_none=True)
+
+
+def save_control_config(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Validiere und speichere Steuerlogik-Konfiguration."""
+    cfg = ControlConfig(**data)
+    serialized = cfg.model_dump(exclude_none=True)
+    serialized.setdefault("iobroker_host", IOBROKER_HOST)
+    serialized.setdefault("iobroker_port", IOBROKER_PORT)
+
+    CONTROL_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(CONTROL_CONFIG_FILE, "w") as f:
+        json.dump(serialized, f, indent=2)
+
+    return serialized
 
 
 def _slugify(value: str) -> str:
@@ -334,6 +365,68 @@ def iobroker_tree():
         return jsonify(tree)
     except Exception as e:
         logger.error(f"Fehler beim Aufbau des ioBroker-Objektbaums: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# API ENDPOINTS - STEUERLOGIK (FORECAST -> EMPFEHLUNG -> IOBROKER)
+# ============================================================================
+
+@app.route("/api/control/plan", methods=["POST"])
+def create_control_plan_endpoint():
+    """Erzeuge einen Fahrplan fuer steuerbare Verbraucher.
+
+    Erwartet Forecast-Slots und Geraeteparameter im Request-Body.
+    Optional kann der Plan direkt als Status nach ioBroker geschrieben werden.
+    """
+    try:
+        raw = dict(request.json or {})
+        base = load_control_config()
+        merged = {**base, **raw}
+        for key in ("dhw", "climate", "wallbox"):
+            base_section = base.get(key) if isinstance(base.get(key), dict) else {}
+            raw_section = raw.get(key) if isinstance(raw.get(key), dict) else {}
+            if base_section or raw_section:
+                merged[key] = {**base_section, **raw_section}
+
+        merged.setdefault("iobroker_host", IOBROKER_HOST)
+        merged.setdefault("iobroker_port", IOBROKER_PORT)
+
+        payload = ControlPlanRequest(**merged)
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(create_control_plan(payload))
+        return jsonify(result.model_dump())
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Fehler beim Erstellen des Steuerplans: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/control/config", methods=["GET"])
+def get_control_config_endpoint():
+    """Liefert die persistierte Konfiguration fuer steuerbare Verbraucher."""
+    try:
+        return jsonify(load_control_config())
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Fehler beim Laden der Steuer-Konfiguration: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/control/config", methods=["PUT"])
+def save_control_config_endpoint():
+    """Speichert die persistierte Konfiguration fuer steuerbare Verbraucher."""
+    try:
+        data = dict(request.json or {})
+        return jsonify(save_control_config(data))
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Fehler beim Speichern der Steuer-Konfiguration: {e}")
         return jsonify({"error": str(e)}), 500
 
 
