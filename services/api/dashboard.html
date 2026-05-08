@@ -216,6 +216,42 @@
             vertical-align: middle;
         }
         
+        .date-navigator {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .nav-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+        }
+        
+        .nav-btn:active {
+            transform: translateY(0);
+        }
+        
+        .date-display {
+            color: #333;
+            font-size: 16px;
+            min-width: 200px;
+            font-weight: 600;
+        }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -238,6 +274,13 @@
             </div>
         </div>
         
+        <div class="date-navigator">
+            <button class="nav-btn" onclick="previousDay()">◀ Gestern</button>
+            <div class="date-display" id="date-display">Loading...</div>
+            <button class="nav-btn" onclick="today()">Heute</button>
+            <button class="nav-btn" onclick="nextDay()">Morgen ▶</button>
+        </div>
+        
         <div id="error-container"></div>
         
         <div class="metrics-row" id="metrics-container">
@@ -250,7 +293,7 @@
         <div id="pv-systems-container" style="margin-bottom: 20px;"></div>
         
         <div class="chart-container">
-            <div class="chart-title">Tagesverlauf: Prognostizierte vs. aktuelle PV-Leistung</div>
+            <div class="chart-title">Tagesverlauf: Prognostizierte vs. aktuelle PV-Leistung (0-24 Uhr)</div>
             <canvas id="forecastChart"></canvas>
         </div>
         
@@ -261,28 +304,70 @@
 
     <script>
         let chart = null;
+        let currentDate = new Date();
+        
+        function setDate(date) {
+            currentDate = new Date(date);
+            loadDashboard();
+        }
+        
+        function previousDay() {
+            currentDate.setDate(currentDate.getDate() - 1);
+            loadDashboard();
+        }
+        
+        function today() {
+            currentDate = new Date();
+            loadDashboard();
+        }
+        
+        function nextDay() {
+            currentDate.setDate(currentDate.getDate() + 1);
+            loadDashboard();
+        }
+        
+        function getDateString(date) {
+            return date.toISOString().split('T')[0];
+        }
+        
+        function formatDateDisplay(date) {
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            
+            const dateStr = date.toISOString().split('T')[0];
+            const todayStr = today.toISOString().split('T')[0];
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+            const tomorrowStr = tomorrow.toISOString().split('T')[0];
+            
+            if (dateStr === todayStr) return 'Heute';
+            if (dateStr === yesterdayStr) return 'Gestern';
+            if (dateStr === tomorrowStr) return 'Morgen';
+            
+            return date.toLocaleDateString('de-DE', { weekday: 'long', month: 'short', day: 'numeric' });
+        }
 
         async function loadDashboard() {
             try {
-                const response = await fetch('/api/forecast/daily');
+                const dateStr = getDateString(currentDate);
+                document.getElementById('date-display').textContent = formatDateDisplay(currentDate);
+                
+                const response = await fetch(`/api/forecast/daily?date=${dateStr}`);
                 if (!response.ok) {
                     throw new Error(`API Error: ${response.status}`);
                 }
                 
                 const data = await response.json();
                 
-                // Update Metriken
                 updateMetrics(data);
-                
-                // Render Chart
                 renderForecastChart(data);
-                
-                // Update PV-Systeme
                 updatePVSystems(data);
                 
-                // Status
                 document.getElementById('status-badge').className = 'status-badge ok';
                 document.getElementById('status-badge').textContent = '✓ Aktiv';
+                document.getElementById('error-container').innerHTML = '';
                 
             } catch (error) {
                 console.error('Dashboard load error:', error);
@@ -297,7 +382,6 @@
             const currentPV = data.current_pv_w || 0;
             const model = data.model || {};
             
-            // Durchschnittliche Prognose aus den nächsten Slots
             let avgForecast = 0;
             let maxForecast = 0;
             if (data.forecast_slots && data.forecast_slots.length > 0) {
@@ -312,7 +396,7 @@
                     <div class="value">${currentPV.toLocaleString('de-DE')} <span class="unit">W</span></div>
                 </div>
                 <div class="metric-card">
-                    <h3>Ø Prognose (heute)</h3>
+                    <h3>Ø Prognose</h3>
                     <div class="value">${avgForecast.toLocaleString('de-DE')} <span class="unit">W</span></div>
                 </div>
                 <div class="metric-card">
@@ -357,25 +441,20 @@
         function renderForecastChart(data) {
             const ctx = document.getElementById('forecastChart').getContext('2d');
             
-            // Vorbereite Daten
             const slots = data.forecast_slots || [];
+            
+            // Erstelle 24h Zeitreihe
             const labels = slots.map(s => {
-                const date = new Date(s.ts);
-                return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                try {
+                    const date = new Date(s.ts);
+                    return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                } catch {
+                    return s.ts;
+                }
             });
             
             const forecastValues = slots.map(s => s.pv_w || 0);
             
-            // Historische Daten (mockiert für jetzt; später von ioBroker)
-            // In dieser Version zeigen wir nur den aktuellen Punkt
-            const historicLabels = [...labels];
-            const historicValues = new Array(slots.length).fill(null);
-            const currentPV = data.current_pv_w || 0;
-            if (historicValues.length > 0) {
-                historicValues[historicValues.length - 1] = currentPV;
-            }
-            
-            // Zerstöre alten Chart wenn vorhanden
             if (chart) {
                 chart.destroy();
             }
@@ -393,23 +472,9 @@
                             borderWidth: 3,
                             fill: true,
                             tension: 0.4,
-                            pointRadius: 4,
+                            pointRadius: 3,
                             pointHoverRadius: 6,
                             pointBackgroundColor: '#3b82f6',
-                            pointBorderColor: '#fff',
-                            pointBorderWidth: 2,
-                        },
-                        {
-                            label: '📈 Aktuelle Werte',
-                            data: historicValues,
-                            borderColor: '#f59e0b',
-                            backgroundColor: 'transparent',
-                            borderWidth: 3,
-                            fill: false,
-                            tension: 0.4,
-                            pointRadius: 6,
-                            pointHoverRadius: 8,
-                            pointBackgroundColor: '#f59e0b',
                             pointBorderColor: '#fff',
                             pointBorderWidth: 2,
                         }
@@ -450,7 +515,7 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            max: Math.max(...forecastValues) * 1.1 || 1000,
+                            max: Math.max(...forecastValues) * 1.1 || 2000,
                             ticks: {
                                 font: { size: 12 },
                                 color: '#999',
@@ -465,8 +530,10 @@
                         },
                         x: {
                             ticks: {
-                                font: { size: 12 },
+                                font: { size: 11 },
                                 color: '#999',
+                                maxRotation: 45,
+                                minRotation: 0,
                             },
                             grid: {
                                 display: false,
@@ -483,10 +550,7 @@
             container.innerHTML = `<div class="error-message">${message}</div>`;
         }
 
-        // Initial load
         loadDashboard();
-        
-        // Auto-refresh alle 30 Sekunden
         setInterval(loadDashboard, 30000);
     </script>
 </body>

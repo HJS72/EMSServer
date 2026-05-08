@@ -548,48 +548,45 @@ def dashboard():
 
 @app.route("/api/forecast/daily", methods=["GET"])
 def get_forecast_daily():
-    """Liefert Tages-Forecast + historische PV-Messwerte für Dashboard."""
+    """Liefert Tages-Forecast + historische PV-Messwerte für Dashboard.
+    
+    Query-Parameter:
+    - date: YYYY-MM-DD (default: heute)
+    """
     try:
-        # Lade aktuelle Forecast
-        forecast_file = Path("/etc/ems/latest_forecast.json")
-        if not forecast_file.exists():
-            return jsonify({"error": "Forecast not found"}), 404
+        # Parse optionales Datum
+        date_str = request.args.get("date")
+        if date_str:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        else:
+            target_date = datetime.utcnow().date()
         
-        with open(forecast_file) as f:
-            forecast_data = json.load(f)
+        # Lade Forecast für das angeforderte Datum
+        forecast_data = _load_forecast_for_date(target_date)
+        if not forecast_data:
+            return jsonify({"error": f"Forecast für {target_date} nicht verfügbar"}), 404
         
-        # Hole ioBroker-States für aktuelle PV-Leistung
-        states = get_iobroker_states_sync()
-        
-        # Suche PV-Leistungs-State (konfigurierbar, standard: modbus.0.pv_power)
-        pv_state_id = "modbus.0.pv_power"
+        # Hole ioBroker-States für aktuelle PV-Leistung (nur bei heute)
         current_pv_w = 0
-        if states.get(pv_state_id):
-            state_data = states[pv_state_id]
-            if isinstance(state_data, dict):
-                current_pv_w = state_data.get("val", 0)
+        if target_date == datetime.utcnow().date():
+            states = get_iobroker_states_sync()
+            pv_state_id = "modbus.0.pv_power"
+            if states.get(pv_state_id):
+                state_data = states[pv_state_id]
+                if isinstance(state_data, dict):
+                    current_pv_w = state_data.get("val", 0)
         
-        # Hole History aus ioBroker (sofern History-Plugin aktiv)
-        # Hinweis: Das ist optional; wenn kein History verfügbar, nur aktuelle Werte
-        history_points = _get_pv_history_from_iobroker(pv_state_id, states)
-        
-        # Formatiere Forecast-Slots für Frontend
-        forecast_slots = []
-        for slot in forecast_data.get("slots", []):
-            forecast_slots.append({
-                "ts": slot.get("ts"),
-                "pv_w": slot.get("pv_w"),  # kalibierte PV-Prognose
-                "surplus_w": slot.get("surplus_w"),
-            })
+        # Generiere 24h Zeitreihe (0:00 - 23:45)
+        full_slots = _generate_24h_slots(forecast_data.get("slots", []), target_date)
         
         response = {
+            "date": target_date.isoformat(),
             "provider": forecast_data.get("provider"),
             "generated_at": forecast_data.get("generated_at"),
             "pv_systems": forecast_data.get("pv_systems", []),
-            "forecast_slots": forecast_slots,
+            "forecast_slots": full_slots,
             "current_pv_w": current_pv_w,
-            "history": history_points,  # [{"ts": "...", "pv_w": ...}, ...]
-            "model": forecast_data.get("model"),  # Kalibrierungsmodell
+            "model": forecast_data.get("model"),
         }
         
         return jsonify(response)
@@ -599,25 +596,75 @@ def get_forecast_daily():
         return jsonify({"error": str(e)}), 500
 
 
-def _get_pv_history_from_iobroker(pv_state_id: str, states: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """
-    Versuche, PV-Historien aus ioBroker zu laden.
-    Fallback: Returne leere Liste, wenn kein History-Plugin aktiv.
-    """
-    history = []
-    try:
-        # Wenn History-Plugin aktiv, gibt es einen state history.pv_power
-        # Das ist optional und hängt von der ioBroker-Konfiguration ab
-        history_state_id = f"history.0.{pv_state_id}"
-        
-        # Hier würde man einen weiteren HTTP-Call zu ioBroker machen
-        # für den Historien-API, z.B. /history
-        # Placeholder: Einfach leere Liste, da wir keinen direkten History-Zugriff haben
-        pass
-    except Exception as e:
-        logger.debug(f"Kein History verfügbar: {e}")
+def _load_forecast_for_date(target_date) -> Optional[Dict[str, Any]]:
+    """Lade Forecast für ein bestimmtes Datum.
     
-    return history
+    Versucht in dieser Reihenfolge:
+    1. Archive (falls vorhanden)
+    2. Aktuelle Forecast (für heute)
+    """
+    # Für heute: aktuelle Forecast
+    if target_date == datetime.utcnow().date():
+        forecast_file = Path("/etc/ems/latest_forecast.json")
+        if forecast_file.exists():
+            with open(forecast_file) as f:
+                return json.load(f)
+    
+    # Für andere Tage: versuche Archive
+    archive_path = Path("/etc/ems/archive")
+    if archive_path.exists():
+        archive_file = archive_path / f"forecast-{target_date.isoformat()}.json"
+        if archive_file.exists():
+            with open(archive_file) as f:
+                return json.load(f)
+    
+    return None
+
+
+def _generate_24h_slots(slots: List[Dict[str, Any]], target_date) -> List[Dict[str, Any]]:
+    """Generiere volle 24h Zeitreihe (0:00 - 23:45) mit 15-Min-Intervallen.
+    
+    Füllt Lücken mit 0W, wenn Slots nicht verfügbar.
+    """
+    from datetime import time
+    
+    # Erstelle Map von existierenden Slots nach Timestamp
+    slot_map = {}
+    for slot in slots:
+        ts_str = slot.get("ts")
+        if ts_str:
+            try:
+                ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                slot_map[ts] = slot
+            except:
+                pass
+    
+    # Generiere alle 96 Slots für 24h (0:00, 0:15, ..., 23:45)
+    result = []
+    for hour in range(24):
+        for minute in [0, 15, 30, 45]:
+            dt = datetime.combine(
+                target_date,
+                time(hour=hour, minute=minute)
+            )
+            dt_utc = dt.replace(tzinfo=None)
+            
+            slot = slot_map.get(dt_utc)
+            if slot:
+                result.append({
+                    "ts": slot["ts"],
+                    "pv_w": slot.get("pv_w", 0),
+                    "surplus_w": slot.get("surplus_w", 0),
+                })
+            else:
+                # Fülle mit 0W wenn kein Slot vorhanden
+                result.append({
+                    "ts": dt_utc.isoformat() + "Z",
+                    "pv_w": 0,
+                    "surplus_w": 0,
+                })
+    
+    return result
 
 
 # ============================================================================
