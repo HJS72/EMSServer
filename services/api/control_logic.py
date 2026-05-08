@@ -42,8 +42,6 @@ class ClimateConfig(BaseModel):
 
 class WallboxConfig(BaseModel):
     enabled: bool = True
-    auto_mode: bool = True
-    auto_mode_state_id: Optional[str] = None
     min_power_w: float = 1400.0
     max_power_w: float = 22000.0
     phase_switch_power_w: float = 4200.0
@@ -182,8 +180,8 @@ def _plan_wallbox(
     current_soc_pct: float,
     current_phase_mode: str,
 ) -> _DeviceAction:
-    if not cfg.enabled or not cfg.auto_mode:
-        return _DeviceAction(on=False, power_w=0.0, reason="disabled_or_not_auto")
+    if not cfg.enabled:
+        return _DeviceAction(on=False, power_w=0.0, reason="disabled")
 
     if cfg.vehicle_capacity_kwh <= 0:
         return _DeviceAction(on=False, power_w=0.0, reason="invalid_vehicle_capacity")
@@ -211,19 +209,6 @@ async def create_control_plan(payload: ControlPlanRequest) -> ControlPlanRespons
     climate_cfg = payload.climate
     wallbox_cfg = payload.wallbox
 
-    if wallbox_cfg and wallbox_cfg.auto_mode_state_id:
-        try:
-            auto_mode_value = await _get_iobroker_value(
-                payload.iobroker_host,
-                payload.iobroker_port,
-                wallbox_cfg.auto_mode_state_id,
-            )
-            wallbox_cfg.auto_mode = bool(auto_mode_value)
-        except Exception:
-            # Wenn der externe Auto-Mode-State gerade nicht erreichbar ist,
-            # bleibt der zuletzt gesetzte Wert bestehen.
-            pass
-
     dhw_temp = dhw_cfg.temp_current_c if dhw_cfg else None
     climate_temp = climate_cfg.temp_current_c if climate_cfg else None
     wallbox_soc = wallbox_cfg.vehicle_soc_pct if wallbox_cfg else None
@@ -236,6 +221,37 @@ async def create_control_plan(payload: ControlPlanRequest) -> ControlPlanRespons
         notes: List[str] = []
         available_w = max(0.0, slot.surplus_w)
 
+        # DHW und Climate haben Vorrang – Wallbox nimmt was übrig bleibt (≥ min_power_w)
+        dhw_action = _DeviceAction(False, 0.0, "not_configured")
+        if dhw_cfg and dhw_temp is not None:
+            dhw_action = _plan_dhw(
+                dhw_cfg,
+                available_w=available_w,
+                at_end_of_horizon=idx >= tail_start_index,
+                current_temp_c=dhw_temp,
+            )
+            if dhw_action.on:
+                used_dhw_power = min(available_w, dhw_action.power_w)
+                available_w = max(0.0, available_w - used_dhw_power)
+                dhw_temp = min(dhw_cfg.temp_max_c, dhw_temp + dhw_cfg.heat_gain_c_per_slot)
+            else:
+                dhw_temp = max(dhw_cfg.temp_min_c - 20.0, dhw_temp - dhw_cfg.cool_loss_c_per_slot)
+
+        climate_action = _DeviceAction(False, 0.0, "not_configured")
+        if climate_cfg and climate_temp is not None:
+            climate_action = _plan_climate(
+                climate_cfg,
+                available_w=available_w,
+                current_temp_c=climate_temp,
+            )
+            if climate_action.on:
+                used_climate_power = min(available_w, climate_action.power_w)
+                available_w = max(0.0, available_w - used_climate_power)
+                climate_temp = max(climate_cfg.temp_min_c, climate_temp - climate_cfg.cool_gain_c_per_slot)
+            else:
+                climate_temp = climate_temp + climate_cfg.heat_gain_c_per_slot
+
+        # Wallbox ist passiv: lädt mit verbleibendem Überschuss, mind. min_power_w
         wallbox_action = _DeviceAction(False, 0.0, "not_configured")
         if wallbox_cfg and wallbox_soc is not None:
             wallbox_action = _plan_wallbox(
@@ -262,40 +278,9 @@ async def create_control_plan(payload: ControlPlanRequest) -> ControlPlanRespons
                 soc_delta = (charged_kwh / wallbox_cfg.vehicle_capacity_kwh) * 100.0
                 wallbox_soc = min(100.0, wallbox_soc + soc_delta)
             else:
+                if available_w < wallbox_cfg.min_power_w and wallbox_action.reason == "not_enough_surplus":
+                    notes.append("wallbox_below_min_surplus_dhw_climate_prioritized")
                 wallbox_phase_mode = "off"
-
-        block_others_due_to_phase_switch = wallbox_buffer_remaining > 0
-        if block_others_due_to_phase_switch:
-            notes.append("other_devices_blocked_during_wallbox_phase_switch")
-
-        dhw_action = _DeviceAction(False, 0.0, "not_configured")
-        if dhw_cfg and dhw_temp is not None and not block_others_due_to_phase_switch:
-            dhw_action = _plan_dhw(
-                dhw_cfg,
-                available_w=available_w,
-                at_end_of_horizon=idx >= tail_start_index,
-                current_temp_c=dhw_temp,
-            )
-            if dhw_action.on:
-                used_dhw_power = min(available_w, dhw_action.power_w)
-                available_w = max(0.0, available_w - used_dhw_power)
-                dhw_temp = min(dhw_cfg.temp_max_c, dhw_temp + dhw_cfg.heat_gain_c_per_slot)
-            else:
-                dhw_temp = max(dhw_cfg.temp_min_c - 20.0, dhw_temp - dhw_cfg.cool_loss_c_per_slot)
-
-        climate_action = _DeviceAction(False, 0.0, "not_configured")
-        if climate_cfg and climate_temp is not None and not block_others_due_to_phase_switch:
-            climate_action = _plan_climate(
-                climate_cfg,
-                available_w=available_w,
-                current_temp_c=climate_temp,
-            )
-            if climate_action.on:
-                used_climate_power = min(available_w, climate_action.power_w)
-                available_w = max(0.0, available_w - used_climate_power)
-                climate_temp = max(climate_cfg.temp_min_c, climate_temp - climate_cfg.cool_gain_c_per_slot)
-            else:
-                climate_temp = climate_temp + climate_cfg.heat_gain_c_per_slot
 
         results.append(
             ControlPlanSlotResult(

@@ -173,15 +173,12 @@ def _merge_control_devices(config: Dict[str, Any]) -> Dict[str, Any]:
         elif section == "wallbox":
             command_state_id = _measurement_iobroker_id(device, "enabled")
             status_state_id = _measurement_iobroker_id(device, "plan")
-            auto_mode_state_id = _measurement_iobroker_id(device, "auto_mode")
             soc_state_id = _measurement_iobroker_id(device, "vehicle_soc")
 
             if command_state_id and not section_cfg.get("command_state_id"):
                 section_cfg["command_state_id"] = command_state_id
             if status_state_id and not section_cfg.get("status_state_id"):
                 section_cfg["status_state_id"] = status_state_id
-            if auto_mode_state_id and not section_cfg.get("auto_mode_state_id"):
-                section_cfg["auto_mode_state_id"] = auto_mode_state_id
             if "vehicle_soc_pct" not in section_cfg:
                 live_soc = _coerce_float(_state_value_from_snapshot(states, soc_state_id))
                 if live_soc is not None:
