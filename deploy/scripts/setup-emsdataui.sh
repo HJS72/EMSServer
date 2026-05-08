@@ -24,15 +24,15 @@ apt-get install -y curl gpg ca-certificates
 
 # --- InfluxDB 2.x -------------------------------------------------------------
 if ! command -v influxd &>/dev/null; then
-    mkdir -p /etc/apt/keyrings
-    curl -fsSL https://repos.influxdata.com/influxdata-archive_compat.key \
-        | gpg --dearmor -o /etc/apt/keyrings/influxdata.gpg
-    chmod a+r /etc/apt/keyrings/influxdata.gpg
-    echo "deb [signed-by=/etc/apt/keyrings/influxdata.gpg] \
-https://repos.influxdata.com/debian bookworm stable" \
-        > /etc/apt/sources.list.d/influxdata.list
-    apt-get update -qq
-    apt-get install -y influxdb2
+    # Direkter .deb-Download umgeht sqv-Signing-Probleme auf Debian 13
+    INFLUX_VERSION="2.7.11"
+    ARCH=$(dpkg --print-architecture)
+    INFLUX_DEB="influxdb2_${INFLUX_VERSION}_${ARCH}.deb"
+    INFLUX_URL="https://dl.influxdata.com/influxdb/releases/${INFLUX_DEB}"
+    echo "  Lade InfluxDB ${INFLUX_VERSION} (${ARCH})..."
+    curl -fsSL "${INFLUX_URL}" -o "/tmp/${INFLUX_DEB}"
+    dpkg -i "/tmp/${INFLUX_DEB}"
+    rm -f "/tmp/${INFLUX_DEB}"
     echo "  [+] InfluxDB 2 installiert."
 else
     echo "  [OK] InfluxDB bereits vorhanden."
@@ -42,10 +42,10 @@ systemctl enable --now influxdb
 echo "  [+] InfluxDB gestartet."
 
 # --- InfluxDB initialisieren (erster Start) ----------------------------------
-if ! influx ping &>/dev/null 2>&1; then
-    echo "  Warte auf InfluxDB..."
-    sleep 5
-fi
+echo "  Warte auf InfluxDB..."
+for i in $(seq 1 10); do
+    influx ping &>/dev/null 2>&1 && break || sleep 3
+done
 
 if ! influx org list &>/dev/null 2>&1; then
     echo ""
