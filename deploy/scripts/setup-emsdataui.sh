@@ -24,10 +24,12 @@ apt-get install -y curl gpg ca-certificates
 
 # --- InfluxDB 2.x -------------------------------------------------------------
 if ! command -v influxd &>/dev/null; then
+    mkdir -p /etc/apt/keyrings
     curl -fsSL https://repos.influxdata.com/influxdata-archive_compat.key \
-        | gpg --dearmor -o /etc/apt/trusted.gpg.d/influxdata.gpg
-    echo "deb [signed-by=/etc/apt/trusted.gpg.d/influxdata.gpg] \
-https://repos.influxdata.com/debian stable main" \
+        | gpg --dearmor -o /etc/apt/keyrings/influxdata.gpg
+    chmod a+r /etc/apt/keyrings/influxdata.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/influxdata.gpg] \
+https://repos.influxdata.com/debian bookworm stable" \
         > /etc/apt/sources.list.d/influxdata.list
     apt-get update -qq
     apt-get install -y influxdb2
@@ -62,9 +64,11 @@ fi
 
 # --- Grafana ------------------------------------------------------------------
 if ! command -v grafana-server &>/dev/null; then
+    mkdir -p /etc/apt/keyrings
     curl -fsSL https://apt.grafana.com/gpg.key \
-        | gpg --dearmor -o /etc/apt/trusted.gpg.d/grafana.gpg
-    echo "deb [signed-by=/etc/apt/trusted.gpg.d/grafana.gpg] \
+        | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
+    chmod a+r /etc/apt/keyrings/grafana.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] \
 https://apt.grafana.com stable main" \
         > /etc/apt/sources.list.d/grafana.list
     apt-get update -qq
