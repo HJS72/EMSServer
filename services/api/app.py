@@ -603,12 +603,13 @@ def _load_forecast_for_date(target_date) -> Optional[Dict[str, Any]]:
     1. Archive (falls vorhanden)
     2. Aktuelle Forecast (für heute)
     """
-    # Für heute: aktuelle Forecast
-    if target_date == datetime.utcnow().date():
-        forecast_file = Path("/etc/ems/latest_forecast.json")
-        if forecast_file.exists():
-            with open(forecast_file) as f:
-                return json.load(f)
+    # Für heute und morgen: aktuelle Forecast enthält beide Tage.
+    forecast_file = Path("/etc/ems/latest_forecast.json")
+    if forecast_file.exists():
+        with open(forecast_file) as f:
+            current_forecast = json.load(f)
+        if _forecast_contains_date(current_forecast, target_date):
+            return current_forecast
     
     # Für andere Tage: versuche Archive
     archive_path = Path("/etc/ems/archive")
@@ -619,6 +620,16 @@ def _load_forecast_for_date(target_date) -> Optional[Dict[str, Any]]:
                 return json.load(f)
     
     return None
+
+
+def _forecast_contains_date(forecast_data: Dict[str, Any], target_date) -> bool:
+    """Prüft, ob eine Forecast-Datei Slots für das angeforderte Datum enthält."""
+    target_prefix = f"{target_date.isoformat()}T"
+    for slot in forecast_data.get("slots", []):
+        ts_str = str(slot.get("ts") or "")
+        if ts_str.startswith(target_prefix):
+            return True
+    return False
 
 
 def _generate_24h_slots(slots: List[Dict[str, Any]], target_date) -> List[Dict[str, Any]]:
