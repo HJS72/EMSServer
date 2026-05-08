@@ -1,6 +1,7 @@
 """Konfigurationsmodelle und Loader fuer den EMS-Server."""
 from __future__ import annotations
 
+import json
 import os
 from typing import List
 
@@ -61,3 +62,47 @@ def load_config(path: str | None = None) -> EMSConfig:
     if token := os.environ.get("EMS_INFLUX_TOKEN"):
         raw.setdefault("influxdb", {})["token"] = token
     return EMSConfig(**raw)
+
+
+def load_device_config(path: str | None = None) -> dict:
+    """Lade Device-Konfiguration aus JSON."""
+    import json
+    device_path = path or os.environ.get("EMS_DEVICES_CONFIG", "/etc/ems/devices.json")
+    if not os.path.exists(device_path):
+        return {"devices": []}
+    with open(device_path) as f:
+        return json.load(f)
+
+
+def devices_to_datapoints(devices_config: dict) -> List[DataPoint]:
+    """Konvertiere Device-Config zu Datenpunkten für Collector."""
+    datapoints = []
+    for device in devices_config.get("devices", []):
+        if not device.get("enabled", True):
+            continue
+        
+        device_id = device.get("id")
+        device_name = device.get("name")
+        device_type = device.get("type")
+        
+        for measurement_key, measurement in device.get("measurements", {}).items():
+            iobroker_id = measurement.get("iobroker_id", "")
+            if not iobroker_id:
+                continue
+            
+            # Alias: device_id + measurement_key
+            alias = f"{device_id}_{measurement_key}"
+            
+            dp = DataPoint(
+                id=iobroker_id,
+                alias=alias,
+                measurement=f"{device_type}_{measurement_key}",  # z.B. "grid_power", "producer_energy"
+                device_id=device_id,
+                device_type=device_type,
+                unit=measurement.get("unit", ""),
+                scale=measurement.get("scale", 1.0),
+                writable=measurement.get("writable", False),
+            )
+            datapoints.append(dp)
+    
+    return datapoints

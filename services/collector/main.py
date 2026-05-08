@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from influxdb_client.client.write.point import Point
 
-from shared.config import DataPoint, EMSConfig, load_config
+from shared.config import DataPoint, EMSConfig, load_config, load_device_config, devices_to_datapoints
 from shared.influx_client import InfluxWriter
 from .iobroker import IoBrokerClient
 
@@ -31,12 +31,26 @@ class Collector:
             port=self.cfg.iobroker.port,
             timeout=self.cfg.iobroker.timeout,
         )
+        
+        # Lade Datenpunkte: zuerst aus config.yaml, dann aus devices.json
+        all_datapoints = list(self.cfg.datapoints)
+        
+        # Versuche Device-Config zu laden
+        try:
+            devices_config = load_device_config()
+            device_datapoints = devices_to_datapoints(devices_config)
+            all_datapoints.extend(device_datapoints)
+            logger.info("Device-Config geladen: %d Datenpunkte hinzugefügt", len(device_datapoints))
+        except Exception as e:
+            logger.warning("Fehler beim Laden von Device-Config: %s", e)
+        
         # Puffer fuer laufende Aggregation: alias -> [float, ...]
         self._buffer: Dict[str, List[float]] = defaultdict(list)
         self._last_agg: float = time.monotonic()
         self._running = True
-        self._alias_map: Dict[str, DataPoint] = {dp.alias: dp for dp in self.cfg.datapoints}
-        self._id_map: Dict[str, DataPoint] = {dp.id: dp for dp in self.cfg.datapoints}
+        self._alias_map: Dict[str, DataPoint] = {dp.alias: dp for dp in all_datapoints}
+        self._id_map: Dict[str, DataPoint] = {dp.id: dp for dp in all_datapoints}
+        self._datapoints = all_datapoints
 
     def stop(self) -> None:
         self._running = False
@@ -56,7 +70,7 @@ class Collector:
             await asyncio.sleep(self.cfg.collector.poll_interval_s)
 
     async def _poll_once(self) -> None:
-        state_ids = [dp.id for dp in self.cfg.datapoints]
+        state_ids = [dp.id for dp in self._datapoints]
         now = datetime.now(timezone.utc)
 
         try:

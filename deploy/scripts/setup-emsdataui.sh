@@ -5,6 +5,7 @@
 # Ziel-OS:  Debian 12 (Bookworm)
 # =============================================================================
 set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
 
 if [[ "$(id -u)" -ne 0 ]]; then
     echo "Fehler: Skript muss als root ausgefuehrt werden (z.B. 'bash setup-emsdataui.sh' als root-User im CT)."
@@ -24,15 +25,19 @@ apt-get install -y curl gpg ca-certificates
 
 # --- InfluxDB 2.x -------------------------------------------------------------
 if ! command -v influxd &>/dev/null; then
-    # Direkter .deb-Download umgeht sqv-Signing-Probleme auf Debian 13
-    INFLUX_VERSION="2.7.11"
-    ARCH=$(dpkg --print-architecture)
-    INFLUX_DEB="influxdb2_${INFLUX_VERSION}_${ARCH}.deb"
-    INFLUX_URL="https://dl.influxdata.com/influxdb/releases/${INFLUX_DEB}"
-    echo "  Lade InfluxDB ${INFLUX_VERSION} (${ARCH})..."
-    curl -fsSL "${INFLUX_URL}" -o "/tmp/${INFLUX_DEB}"
-    dpkg -i "/tmp/${INFLUX_DEB}"
-    rm -f "/tmp/${INFLUX_DEB}"
+    mkdir -p /etc/apt/keyrings
+    GNUPGHOME=$(mktemp -d)
+    chmod 700 "${GNUPGHOME}"
+    gpg --batch --homedir "${GNUPGHOME}" --keyserver hkps://keyserver.ubuntu.com \
+        --recv-keys DA61C26A0585BD3B
+    gpg --batch --homedir "${GNUPGHOME}" --export DA61C26A0585BD3B > /tmp/influx-key.asc
+    gpg --batch --yes --dearmor -o /etc/apt/keyrings/influxdata.gpg /tmp/influx-key.asc
+    rm -rf "${GNUPGHOME}" /tmp/influx-key.asc
+    chmod a+r /etc/apt/keyrings/influxdata.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/influxdata.gpg] https://repos.influxdata.com/debian stable main" \
+        > /etc/apt/sources.list.d/influxdata.list
+    apt-get update -qq
+    apt-get install -y -o Dpkg::Options::="--force-confold" influxdb2
     echo "  [+] InfluxDB 2 installiert."
 else
     echo "  [OK] InfluxDB bereits vorhanden."
@@ -72,7 +77,7 @@ if ! command -v grafana-server &>/dev/null; then
 https://apt.grafana.com stable main" \
         > /etc/apt/sources.list.d/grafana.list
     apt-get update -qq
-    apt-get install -y grafana
+    apt-get install -y -o Dpkg::Options::="--force-confold" grafana
     echo "  [+] Grafana installiert."
 else
     echo "  [OK] Grafana bereits vorhanden."
