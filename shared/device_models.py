@@ -24,7 +24,7 @@ class MeasurementMapping(BaseModel):
     """Abbildung eines Messwertes zu einem ioBroker State."""
     name: str                # Bezeichnung (z.B. "Leistung", "Tagesenergie")
     iobroker_id: str        # ioBroker State-ID
-    unit: str               # Einheit (W, kWh, etc.)
+    unit: str               # Einheit (W, Wh, etc.)
     writable: bool = False  # Kann geschrieben werden?
     scale: float = 1.0      # Skalierungsfaktor
     required: bool = True   # Erforderlich für diesen Device-Typ?
@@ -74,14 +74,14 @@ DEVICE_TEMPLATES = {
             "energy_import_today": MeasurementMapping(
                 name="Tagesenergie Bezug",
                 iobroker_id="",
-                unit="kWh",
+                unit="Wh",
                 writable=False,
                 required=True,
             ),
             "energy_export_today": MeasurementMapping(
                 name="Tagesenergie Einspeisung",
                 iobroker_id="",
-                unit="kWh",
+                unit="Wh",
                 writable=False,
                 required=True,
             ),
@@ -101,14 +101,14 @@ DEVICE_TEMPLATES = {
             "energy_today": MeasurementMapping(
                 name="Tagesenergie",
                 iobroker_id="",
-                unit="kWh",
+                unit="Wh",
                 writable=False,
                 required=True,
             ),
             "energy_total": MeasurementMapping(
                 name="Gesamtenergie",
                 iobroker_id="",
-                unit="kWh",
+                unit="Wh",
                 writable=False,
                 required=False,
             ),
@@ -127,7 +127,7 @@ DEVICE_TEMPLATES = {
             "energy_today": MeasurementMapping(
                 name="Tagesenergie",
                 iobroker_id="",
-                unit="kWh",
+                unit="Wh",
                 writable=False,
                 required=False,
             ),
@@ -182,7 +182,7 @@ DEVICE_TEMPLATES = {
             "energy_today": MeasurementMapping(
                 name="Tagesenergie",
                 iobroker_id="",
-                unit="kWh",
+                unit="Wh",
                 writable=False,
                 required=False,
             ),
@@ -237,7 +237,7 @@ DEVICE_TEMPLATES = {
             "energy_today": MeasurementMapping(
                 name="Tagesenergie",
                 iobroker_id="",
-                unit="kWh",
+                unit="Wh",
                 writable=False,
                 required=False,
             ),
@@ -299,7 +299,7 @@ DEVICE_TEMPLATES = {
             "energy_today": MeasurementMapping(
                 name="Tagesenergie",
                 iobroker_id="",
-                unit="kWh",
+                unit="Wh",
                 writable=False,
                 required=False,
             ),
@@ -348,14 +348,14 @@ DEVICE_TEMPLATES = {
             "pv_energy_today": MeasurementMapping(
                 name="PV-Energie heute",
                 iobroker_id="",
-                unit="kWh",
+                unit="Wh",
                 writable=False,
                 required=False,
             ),
             "pv_energy_total": MeasurementMapping(
                 name="PV-Energie gesamt",
                 iobroker_id="",
-                unit="kWh",
+                unit="Wh",
                 writable=False,
                 required=False,
             ),
@@ -385,7 +385,7 @@ DEVICE_TEMPLATES = {
             "batt_energy_max": MeasurementMapping(
                 name="Batterie max Energie",
                 iobroker_id="",
-                unit="kWh",
+                unit="Wh",
                 writable=False,
                 required=False,
             ),
