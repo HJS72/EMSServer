@@ -433,25 +433,7 @@
             const labels = slots.map(s => timeLabelFromTs(s.ts));
             
             const forecastValues = slots.map(s => s.pv_w || 0);
-            const currentPVValue = data.current_pv_w || 0;
             const actualValues = actualSlots.map(s => s.pv_w ?? null);
-
-            // Falls keine IST-Historie vorhanden ist, zeige genau einen aktuellen Punkt
-            // anstatt einer Flatline ueber den gesamten Tag.
-            const hasActualHistory = actualValues.some(v => v !== null);
-            if (!hasActualHistory && currentPVValue > 0 && slots.length > 0) {
-                const now = new Date();
-                let fallbackIndex = -1;
-                for (let i = 0; i < slots.length; i += 1) {
-                    const slotDate = new Date(slots[i].ts);
-                    if (!Number.isNaN(slotDate.getTime()) && slotDate <= now) {
-                        fallbackIndex = i;
-                    }
-                }
-                if (fallbackIndex >= 0) {
-                    actualValues[fallbackIndex] = currentPVValue;
-                }
-            }
             
             const forecastLocation = data.forecast_location || {};
             const sunValues = slots.map(s => {

@@ -749,7 +749,7 @@ def _load_actual_slots_for_date(target_date) -> List[Dict[str, Any]]:
 from(bucket: "{cfg.influxdb.bucket_raw}")
   |> range(start: {start_utc}, stop: {stop_utc})
   |> filter(fn: (r) => r["_field"] == "value")
-  |> filter(fn: (r) => r["_measurement"] == "power" and r["device_id"] == "pv1")
+    |> filter(fn: (r) => (r["_measurement"] == "producer_power" or r["_measurement"] == "power") and r["device_id"] == "pv1")
 '''
             with InfluxDBClient(url=cfg.influxdb.url, token=cfg.influxdb.token, org=cfg.influxdb.org) as client:
                 query_api = client.query_api()
