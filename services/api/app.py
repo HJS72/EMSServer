@@ -612,7 +612,7 @@ def get_forecast_daily():
         
         # Generiere 24h Zeitreihe (0:00 - 23:45)
         full_slots = _generate_24h_slots(forecast_data.get("slots", []), target_date)
-        actual_consumption_hourly = _build_actual_consumption_hourly(target_date)
+        actual_consumption_quarterly = _build_actual_consumption_quarterly(target_date)
         
         response = {
             "date": target_date.isoformat(),
@@ -622,7 +622,7 @@ def get_forecast_daily():
             "forecast_slots": full_slots,
             "actual_slots": _load_actual_slots_for_date(target_date),
             "consumption_hourly": _build_consumption_hourly(full_slots),
-            "consumption_actual_hourly": actual_consumption_hourly,
+            "consumption_actual_quarterly": actual_consumption_quarterly,
             "consumption_labels": _get_consumption_labels(),
             "current_pv_w": current_pv_w,
             "model": forecast_data.get("model"),
@@ -1032,6 +1032,94 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
                 "house_w": house_w,
             }
         )
+
+    return result
+
+
+def _build_actual_consumption_quarterly(target_date, interval_minutes: int = 15) -> List[Dict[str, Any]]:
+    """Liefert IST-Verbrauch pro 15-Min-Intervall direkt aus ems_raw Rohdaten.
+
+    Rückgabe pro Intervall:
+    - dhw_w, climate_w, wallbox_w: gemessene steuerbare Verbraucher (Durchschnitt über Intervall)
+    - consumers_total_w: Summe steuerbare Verbraucher
+    - house_w: gemessener Gesamtverbrauch Haus (Device-ID: gesamtverbrauch)
+    - ts: ISO-Zeitstempel des Intervall-Starts
+    """
+    result: List[Dict[str, Any]] = []
+    
+    try:
+        cfg = load_config()
+        start_local = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=DASHBOARD_TIMEZONE)
+        stop_local = start_local + timedelta(days=1)
+        start_utc = start_local.astimezone(ZoneInfo("UTC")).isoformat()
+        stop_utc = stop_local.astimezone(ZoneInfo("UTC")).isoformat()
+
+        flux = f'''
+from(bucket: "{cfg.influxdb.bucket_raw}")
+  |> range(start: {start_utc}, stop: {stop_utc})
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> filter(fn: (r) =>
+    r["_measurement"] == "dhw_power" or
+    r["_measurement"] == "climate_power" or
+    r["_measurement"] == "wallbox_charging_power" or
+    (r["_measurement"] == "consumer_power" and r["device_id"] == "gesamtverbrauch")
+  )
+  |> aggregateWindow(every: {interval_minutes}m, fn: mean, timeSrc: "start")
+  |> sort(columns: ["_time"])
+'''
+
+        with InfluxDBClient(url=cfg.influxdb.url, token=cfg.influxdb.token, org=cfg.influxdb.org) as client:
+            tables = client.query_api().query(query=flux, org=cfg.influxdb.org)
+
+        # Group by time + measurement
+        by_time: Dict[datetime, Dict[str, float]] = {}
+        for table in tables:
+            for record in table.records:
+                ts = record.get_time()
+                if ts is None:
+                    continue
+                local_ts = ts.astimezone(DASHBOARD_TIMEZONE)
+                if local_ts.date() != target_date:
+                    continue
+                
+                measurement = record.values.get("_measurement")
+                device_id = record.values.get("device_id")
+                value = _coerce_float(record.get_value())
+                if value is None:
+                    continue
+
+                time_key = local_ts.replace(second=0, microsecond=0)
+                if time_key not in by_time:
+                    by_time[time_key] = {}
+                
+                if measurement == "dhw_power":
+                    by_time[time_key]["dhw_w"] = value
+                elif measurement == "climate_power":
+                    by_time[time_key]["climate_w"] = value
+                elif measurement == "wallbox_charging_power":
+                    by_time[time_key]["wallbox_w"] = value
+                elif measurement == "consumer_power" and device_id == "gesamtverbrauch":
+                    by_time[time_key]["house_w"] = value
+
+        for ts_key in sorted(by_time.keys()):
+            row_data = by_time[ts_key]
+            dhw_w = float(row_data.get("dhw_w", 0))
+            climate_w = float(row_data.get("climate_w", 0))
+            wallbox_w = float(row_data.get("wallbox_w", 0))
+            house_w = float(row_data.get("house_w", 0))
+            consumers_total_w = round(dhw_w + climate_w + wallbox_w, 1)
+            
+            result.append({
+                "ts": ts_key.isoformat(),
+                "label": ts_key.strftime("%H:%M"),
+                "dhw_w": round(dhw_w, 1),
+                "climate_w": round(climate_w, 1),
+                "wallbox_w": round(wallbox_w, 1),
+                "consumers_total_w": consumers_total_w,
+                "house_w": round(house_w, 1),
+            })
+    except Exception as e:
+        logger.warning(f"IST-Verbrauch (quarterly) aus Influx nicht verfügbar: {e}")
 
     return result
 

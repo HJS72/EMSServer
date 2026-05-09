@@ -275,7 +275,7 @@
         </div>
 
         <div class="chart-container">
-            <div class="chart-title">Verbrauchsprognose: Verbraucher gestackt pro Stunde (0-24 Uhr)</div>
+            <div class="chart-title">Verbrauchsprognose: Verbraucher gestackt (IST 15min-Intervalle, Prognose stündlich)</div>
             <canvas id="consumptionChart"></canvas>
         </div>
         
@@ -644,79 +644,104 @@
 
         function renderConsumptionChart(data) {
             const ctx = document.getElementById('consumptionChart').getContext('2d');
-            const slots = data.forecast_slots || [];
             const forecastHourly = data.consumption_hourly || [];
-            const actualHourly = data.consumption_actual_hourly || [];
+            const actualQuarterly = data.consumption_actual_quarterly || [];
             const consumptionLabels = data.consumption_labels || {};
             const dhwName = consumptionLabels.dhw || 'Warmwasser';
             const climateName = consumptionLabels.climate || 'Klima';
             const wallboxName = consumptionLabels.wallbox || 'Wallbox';
             const houseName = consumptionLabels.house || 'Haus';
             const forecastName = consumptionLabels.forecast || 'Prognose';
-            const labelsSource = forecastHourly.length ? forecastHourly : actualHourly;
-            const hasQuarterSlots = slots.length > 0;
-            const axisHours = hasQuarterSlots
-                ? slots.map(s => hourFromTs(s.ts))
-                : labelsSource.map(item => normalizeHour(item.hour));
-            const labels = hasQuarterSlots
-                ? slots.map(s => timeLabelFromTs(s.ts))
-                : labelsSource.map(item => `${String(normalizeHour(item.hour)).padStart(2, '0')}:00`);
-
-            const actualByHour = new Map(actualHourly.map(item => [normalizeHour(item.hour), item]));
-            const forecastByHour = new Map(forecastHourly.map(item => [normalizeHour(item.hour), item]));
-            const dhwActualValues = axisHours.map(hour => (actualByHour.get(hour)?.dhw_w) || 0);
-            const climateActualValues = axisHours.map(hour => (actualByHour.get(hour)?.climate_w) || 0);
-            const wallboxActualValues = axisHours.map(hour => (actualByHour.get(hour)?.wallbox_w) || 0);
-            const houseActualValues = axisHours.map(hour => (actualByHour.get(hour)?.house_w) || 0);
-            const forecastTotalValues = axisHours.map(hour => (forecastByHour.get(hour)?.total_w) || 0);
+            
+            const labels = actualQuarterly.map(item => item.label);
+            const dhwActualValues = actualQuarterly.map(item => item.dhw_w || 0);
+            const climateActualValues = actualQuarterly.map(item => item.climate_w || 0);
+            const wallboxActualValues = actualQuarterly.map(item => item.wallbox_w || 0);
+            const houseActualValues = actualQuarterly.map(item => item.house_w || 0);
+            
+            const forecastByTime = new Map(forecastHourly.map(item => [
+                `${String(normalizeHour(item.hour)).padStart(2, '0')}:00`,
+                item
+            ]));
+            const forecastTotalValues = labels.map(lbl => {
+                const match = forecastByTime.get(lbl);
+                return match ? (match.total_w || 0) : 0;
+            });
 
             if (consumptionChart) {
                 consumptionChart.destroy();
             }
 
             consumptionChart = new Chart(ctx, {
-                type: 'bar',
+                type: 'line',
                 data: {
                     labels,
                     datasets: [
                         {
                             label: houseName,
                             data: houseActualValues,
-                            backgroundColor: 'rgba(100, 116, 139, 0.25)',
-                            borderColor: 'rgba(71, 85, 105, 0.75)',
-                            borderWidth: 1,
-                            stack: 'house',
+                            borderColor: 'rgba(71, 85, 105, 1)',
+                            backgroundColor: 'rgba(100, 116, 139, 0.4)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            pointBackgroundColor: 'rgba(71, 85, 105, 1)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 1,
+                            stack: 'ist',
                             order: 5,
                         },
                         {
                             label: dhwName,
                             data: dhwActualValues,
-                            backgroundColor: 'rgba(14, 165, 233, 0.75)',
                             borderColor: 'rgb(14, 165, 233)',
-                            borderWidth: 1,
+                            backgroundColor: 'rgba(14, 165, 233, 0.5)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            pointBackgroundColor: 'rgb(14, 165, 233)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 1,
                             stack: 'ist_consumers',
                             order: 4,
                         },
                         {
                             label: climateName,
                             data: climateActualValues,
-                            backgroundColor: 'rgba(16, 185, 129, 0.75)',
                             borderColor: 'rgb(16, 185, 129)',
-                            borderWidth: 1,
+                            backgroundColor: 'rgba(16, 185, 129, 0.5)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            pointBackgroundColor: 'rgb(16, 185, 129)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 1,
                             stack: 'ist_consumers',
                             order: 4,
                         },
                         {
                             label: wallboxName,
                             data: wallboxActualValues,
-                            backgroundColor: 'rgba(245, 158, 11, 0.8)',
                             borderColor: 'rgb(245, 158, 11)',
-                            borderWidth: 1,
+                            backgroundColor: 'rgba(245, 158, 11, 0.5)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            pointBackgroundColor: 'rgb(245, 158, 11)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 1,
                             stack: 'ist_consumers',
                             order: 4,
                         },
                         {
-                            type: 'line',
                             label: forecastName,
                             data: forecastTotalValues,
                             borderColor: 'rgb(30, 64, 175)',
@@ -725,8 +750,8 @@
                             fill: false,
                             tension: 0.2,
                             spanGaps: true,
-                            pointRadius: 2,
-                            pointHoverRadius: 5,
+                            pointRadius: 3,
+                            pointHoverRadius: 6,
                             pointBackgroundColor: 'rgb(30, 64, 175)',
                             pointBorderColor: '#fff',
                             pointBorderWidth: 1,
@@ -763,10 +788,10 @@
                                         .filter(item => item.dataset.stack === 'ist_consumers')
                                         .reduce((sum, item) => sum + (item.parsed?.y || 0), 0);
                                     const istHouse = items
-                                        .filter(item => item.dataset.stack === 'house')
+                                        .filter(item => item.dataset.stack === 'ist')
                                         .reduce((sum, item) => sum + (item.parsed?.y || 0), 0);
                                     const prognose = items
-                                        .filter(item => item.dataset.type === 'line')
+                                        .filter(item => item.dataset.label === forecastName)
                                         .reduce((sum, item) => sum + (item.parsed?.y || 0), 0);
                                     return `${dhwName}/${climateName}/${wallboxName}: ${istConsumer.toLocaleString('de-DE')} W | ${houseName}: ${istHouse.toLocaleString('de-DE')} W | ${forecastName}: ${prognose.toLocaleString('de-DE')} W`;
                                 }
@@ -780,7 +805,8 @@
                                 font: { size: 11 },
                                 color: '#999',
                                 maxRotation: 0,
-                                autoSkip: false,
+                                autoSkip: true,
+                                maxTicksLimit: 24,
                                 callback: function(value) {
                                     const label = this.getLabelForValue(value);
                                     return isFullHourLabel(label) ? label : '';
