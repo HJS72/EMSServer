@@ -443,6 +443,11 @@
             
             const forecastValues = slots.map(s => s.pv_w || 0);
             const actualValues = actualSlots.map(s => s.pv_w ?? null);
+            
+            // Aktuelle PV-Leistung als horizontale Linie
+            const currentPVValue = data.current_pv_w || 0;
+            const pvCurrentValues = labels.map(() => currentPVValue);
+            
             const forecastLocation = data.forecast_location || {};
             const sunValues = slots.map(s => {
                 const lat = Number(forecastLocation.latitude);
@@ -508,6 +513,19 @@
                             spanGaps: true,
                             pointRadius: 0,
                             pointHoverRadius: 4,
+                        },
+                        {
+                            label: 'Aktuelle PV-Leistung',
+                            data: pvCurrentValues,
+                            borderColor: 'rgb(251, 146, 60)',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            fill: false,
+                            tension: 0,
+                            spanGaps: true,
+                            pointRadius: 0,
+                            pointHoverRadius: 0,
                         }
                     ]
                 },
@@ -652,7 +670,6 @@
             const wallboxName = consumptionLabels.wallbox || 'Wallbox';
             const houseName = consumptionLabels.house || 'Haus';
             const forecastName = consumptionLabels.forecast || 'Prognose';
-            const pvName = 'Aktuelle PV-Leistung';
             
             const labels = actualHourly.map(item => item.label);
             const dhwActualValues = actualHourly.map(item => item.dhw_w || 0);
@@ -668,10 +685,6 @@
                 const match = forecastByTime.get(lbl);
                 return match ? (match.total_w || 0) : 0;
             });
-            
-            // Aktuelle PV-Leistung als horizontale Linie
-            const currentPVValue = data.current_pv_w || 0;
-            const pvCurrentValues = labels.map(() => currentPVValue);
 
             if (consumptionChart) {
                 consumptionChart.destroy();
@@ -761,20 +774,6 @@
                             pointBorderColor: '#fff',
                             pointBorderWidth: 1,
                             order: 1,
-                        },
-                        {
-                            label: pvName,
-                            data: pvCurrentValues,
-                            borderColor: 'rgb(251, 146, 60)',
-                            backgroundColor: 'transparent',
-                            borderWidth: 2,
-                            borderDash: [5, 5],
-                            fill: false,
-                            tension: 0,
-                            spanGaps: true,
-                            pointRadius: 0,
-                            pointHoverRadius: 0,
-                            order: 2,
                         }
                     ]
                 },
