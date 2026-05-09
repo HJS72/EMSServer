@@ -179,22 +179,13 @@
             display: inline-block;
             width: 20px;
             height: 20px;
-            border: 3px solid #f3f3f3;
             border-top: 3px solid #3b82f6;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-right: 10px;
             vertical-align: middle;
         }
-        
-        .date-navigator {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
+
         .nav-btn {
             background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
             color: white;
@@ -701,13 +692,13 @@
             });
 
             const normalConsumerPalette = [
-                ['rgb(217, 119, 6)', 'rgba(217, 119, 6, 0.45)'],
-                ['rgb(220, 38, 38)', 'rgba(220, 38, 38, 0.42)'],
-                ['rgb(124, 58, 237)', 'rgba(124, 58, 237, 0.40)'],
-                ['rgb(2, 132, 199)', 'rgba(2, 132, 199, 0.38)'],
-                ['rgb(21, 128, 61)', 'rgba(21, 128, 61, 0.38)'],
-                ['rgb(190, 24, 93)', 'rgba(190, 24, 93, 0.36)'],
-                ['rgb(6, 95, 70)', 'rgba(6, 95, 70, 0.35)'],
+                ['rgb(217, 119, 6)', 'rgb(217, 119, 6)'],
+                ['rgb(220, 38, 38)', 'rgb(220, 38, 38)'],
+                ['rgb(124, 58, 237)', 'rgb(124, 58, 237)'],
+                ['rgb(2, 132, 199)', 'rgb(2, 132, 199)'],
+                ['rgb(21, 128, 61)', 'rgb(21, 128, 61)'],
+                ['rgb(190, 24, 93)', 'rgb(190, 24, 93)'],
+                ['rgb(6, 95, 70)', 'rgb(6, 95, 70)'],
             ];
 
             const normalConsumerDatasets = normalConsumerIds.map((deviceId, idx) => {
@@ -760,7 +751,7 @@
                             label: wallboxName,
                             data: wallboxActualValues,
                             borderColor: 'rgb(245, 158, 11)',
-                            backgroundColor: 'rgba(245, 158, 11, 0.5)',
+                            backgroundColor: 'rgb(245, 158, 11)',
                             borderWidth: 2,
                             fill: true,
                             tension: 0.2,
@@ -776,7 +767,7 @@
                             label: dhwName,
                             data: dhwActualValues,
                             borderColor: 'rgb(14, 165, 233)',
-                            backgroundColor: 'rgba(14, 165, 233, 0.5)',
+                            backgroundColor: 'rgb(14, 165, 233)',
                             borderWidth: 2,
                             fill: true,
                             tension: 0.2,
@@ -792,7 +783,7 @@
                             label: climateName,
                             data: climateActualValues,
                             borderColor: 'rgb(16, 185, 129)',
-                            backgroundColor: 'rgba(16, 185, 129, 0.5)',
+                            backgroundColor: 'rgb(16, 185, 129)',
                             borderWidth: 2,
                             fill: true,
                             tension: 0.2,
