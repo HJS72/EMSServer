@@ -619,8 +619,9 @@ def get_forecast_daily():
         except Exception as e:
             logger.warning(f"Aktuelle PV-Leistung nicht verfügbar: {e}")
         
-        # Generiere 24h Zeitreihe (0:00 - 23:45)
-        full_slots = _generate_24h_slots(forecast_data.get("slots", []), target_date)
+        # Generiere 24h Zeitreihe (0:00 - 23:45); für fehlende Slots History als Fallback
+        history_map = _load_forecast_history_map()
+        full_slots = _generate_24h_slots(forecast_data.get("slots", []), target_date, history_map)
         actual_consumption_hourly = _build_actual_consumption_hourly(target_date)
         
         response = {
@@ -680,10 +681,33 @@ def _forecast_contains_date(forecast_data: Dict[str, Any], target_date) -> bool:
     return False
 
 
-def _generate_24h_slots(slots: List[Dict[str, Any]], target_date) -> List[Dict[str, Any]]:
+def _load_forecast_history_map(history_path: str = "/var/lib/ems/open_meteo_history.json") -> Dict[tuple, float]:
+    """Lädt historische Forecast-Vorhersagen aus der History-Datei.
+    
+    Gibt ein Dict zurück: {(date, hour, minute): predicted_w}
+    """
+    result: Dict[tuple, float] = {}
+    try:
+        p = Path(history_path)
+        if not p.exists():
+            return result
+        with open(p) as f:
+            history = json.load(f)
+        for item in history:
+            key = _slot_local_key(item.get("ts"))
+            if key is not None:
+                predicted_w = item.get("predicted_w")
+                if predicted_w is not None:
+                    result[key] = float(predicted_w)
+    except Exception as e:
+        logger.warning(f"Forecast-History nicht lesbar: {e}")
+    return result
+
+
+def _generate_24h_slots(slots: List[Dict[str, Any]], target_date, history_map: Optional[Dict[tuple, float]] = None) -> List[Dict[str, Any]]:
     """Generiere volle 24h Zeitreihe (0:00 - 23:45) mit 15-Min-Intervallen.
     
-    Füllt Lücken mit 0W, wenn Slots nicht verfügbar.
+    Füllt Lücken aus der History (predicted_w), falls vorhanden, sonst mit 0W.
     """
     from datetime import time
 
@@ -703,6 +727,7 @@ def _generate_24h_slots(slots: List[Dict[str, Any]], target_date) -> List[Dict[s
                 time(hour=hour, minute=minute)
             )
             slot_key = (target_date, hour, minute)
+            dt_local = dt.replace(tzinfo=DASHBOARD_TIMEZONE)
             
             slot = slot_map.get(slot_key)
             if slot:
@@ -712,11 +737,11 @@ def _generate_24h_slots(slots: List[Dict[str, Any]], target_date) -> List[Dict[s
                     "surplus_w": slot.get("surplus_w", 0),
                 })
             else:
-                # Fülle mit 0W wenn kein Slot vorhanden
-                dt_local = dt.replace(tzinfo=DASHBOARD_TIMEZONE)
+                # Fallback: historische Vorhersage aus History-Datei, sonst 0W
+                history_pv_w = history_map.get(slot_key, 0) if history_map else 0
                 result.append({
                     "ts": dt_local.isoformat(),
-                    "pv_w": 0,
+                    "pv_w": round(history_pv_w, 1),
                     "surplus_w": 0,
                 })
     
