@@ -701,8 +701,14 @@
                 ['rgb(6, 95, 70)', 'rgb(6, 95, 70)'],
             ];
 
+            const normalConsumerColorOverrides = {
+                trockner: ['rgb(236, 72, 153)', 'rgb(236, 72, 153)'],
+                waschmaschine: ['rgb(147, 51, 234)', 'rgb(147, 51, 234)'],
+            };
+
             const normalConsumerDatasets = normalConsumerIds.map((deviceId, idx) => {
-                const [lineColor, fillColor] = normalConsumerPalette[idx % normalConsumerPalette.length];
+                const [lineColor, fillColor] = normalConsumerColorOverrides[deviceId]
+                    || normalConsumerPalette[idx % normalConsumerPalette.length];
                 const label = normalConsumerLabels[deviceId] || deviceId;
                 return {
                     label,
@@ -766,22 +772,6 @@
                         {
                             label: dhwName,
                             data: dhwActualValues,
-                            borderColor: 'rgb(14, 165, 233)',
-                            backgroundColor: 'rgb(14, 165, 233)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.2,
-                            pointRadius: 2,
-                            pointHoverRadius: 5,
-                            pointBackgroundColor: 'rgb(14, 165, 233)',
-                            pointBorderColor: '#fff',
-                            pointBorderWidth: 1,
-                            stack: 'ist_consumers',
-                            order: 4,
-                        },
-                        {
-                            label: climateName,
-                            data: climateActualValues,
                             borderColor: 'rgb(16, 185, 129)',
                             backgroundColor: 'rgb(16, 185, 129)',
                             borderWidth: 2,
@@ -790,6 +780,22 @@
                             pointRadius: 2,
                             pointHoverRadius: 5,
                             pointBackgroundColor: 'rgb(16, 185, 129)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 1,
+                            stack: 'ist_consumers',
+                            order: 4,
+                        },
+                        {
+                            label: climateName,
+                            data: climateActualValues,
+                            borderColor: 'rgb(14, 165, 233)',
+                            backgroundColor: 'rgb(14, 165, 233)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            pointBackgroundColor: 'rgb(14, 165, 233)',
                             pointBorderColor: '#fff',
                             pointBorderWidth: 1,
                             stack: 'ist_consumers',
