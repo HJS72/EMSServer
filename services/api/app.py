@@ -733,11 +733,11 @@ def _load_actual_slots_for_date(target_date) -> List[Dict[str, Any]]:
         try:
             cfg = load_config()
             producer_ids: List[str] = []
+            hybrid_ids: List[str] = []
             try:
-                producer_ids = [
-                    d.id for d in load_devices_config().devices
-                    if d.enabled and d.type == DeviceType.PRODUCER and d.id
-                ]
+                devices = [d for d in load_devices_config().devices if d.enabled]
+                producer_ids = [d.id for d in devices if d.type == DeviceType.PRODUCER and d.id]
+                hybrid_ids = [d.id for d in devices if d.type == DeviceType.HYBRID and d.id]
             except Exception as e:
                 logger.warning(f"Konnte Producer-IDs nicht laden: {e}")
 
@@ -754,16 +754,24 @@ def _load_actual_slots_for_date(target_date) -> List[Dict[str, Any]]:
             
             start_utc = start_local.astimezone(ZoneInfo("UTC")).isoformat()
 
-            device_filter = ""
+            producer_filter = "false"
             if producer_ids:
-                filter_parts = [f'r["device_id"] == "{pid}"' for pid in producer_ids]
-                device_filter = " and (" + " or ".join(filter_parts) + ")"
+                producer_parts = [f'r["device_id"] == "{pid}"' for pid in producer_ids]
+                producer_filter = "(" + " or ".join(producer_parts) + ")"
+
+            hybrid_filter = "false"
+            if hybrid_ids:
+                hybrid_parts = [f'r["device_id"] == "{hid}"' for hid in hybrid_ids]
+                hybrid_filter = "(" + " or ".join(hybrid_parts) + ")"
             
             flux = f'''
 from(bucket: "{cfg.influxdb.bucket_raw}")
   |> range(start: {start_utc}, stop: {stop_utc})
   |> filter(fn: (r) => r["_field"] == "value")
-  |> filter(fn: (r) => r["_measurement"] == "producer_power"{device_filter})
+    |> filter(fn: (r) =>
+        (r["_measurement"] == "producer_power" and {producer_filter}) or
+        (r["_measurement"] == "hybrid_pv_power" and {hybrid_filter})
+    )
 '''
             with InfluxDBClient(url=cfg.influxdb.url, token=cfg.influxdb.token, org=cfg.influxdb.org) as client:
                 query_api = client.query_api()
