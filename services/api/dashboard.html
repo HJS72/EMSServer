@@ -645,7 +645,7 @@
         function renderConsumptionChart(data) {
             const ctx = document.getElementById('consumptionChart').getContext('2d');
             const forecastHourly = data.consumption_hourly || [];
-            const actualQuarterly = data.consumption_actual_quarterly || [];
+            const actualHourly = data.consumption_actual_hourly || [];
             const consumptionLabels = data.consumption_labels || {};
             const dhwName = consumptionLabels.dhw || 'Warmwasser';
             const climateName = consumptionLabels.climate || 'Klima';
@@ -653,11 +653,11 @@
             const houseName = consumptionLabels.house || 'Haus';
             const forecastName = consumptionLabels.forecast || 'Prognose';
             
-            const labels = actualQuarterly.map(item => item.label);
-            const dhwActualValues = actualQuarterly.map(item => item.dhw_w || 0);
-            const climateActualValues = actualQuarterly.map(item => item.climate_w || 0);
-            const wallboxActualValues = actualQuarterly.map(item => item.wallbox_w || 0);
-            const houseActualValues = actualQuarterly.map(item => item.house_w || 0);
+            const labels = actualHourly.map(item => item.label);
+            const dhwActualValues = actualHourly.map(item => item.dhw_w || 0);
+            const climateActualValues = actualHourly.map(item => item.climate_w || 0);
+            const wallboxActualValues = actualHourly.map(item => item.wallbox_w || 0);
+            const houseActualValues = actualHourly.map(item => item.house_w || 0);
             
             const forecastByTime = new Map(forecastHourly.map(item => [
                 `${String(normalizeHour(item.hour)).padStart(2, '0')}:00`,
