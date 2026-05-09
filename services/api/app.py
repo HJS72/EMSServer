@@ -724,7 +724,7 @@ def _generate_24h_slots(slots: List[Dict[str, Any]], target_date) -> List[Dict[s
 
 
 def _load_actual_slots_for_date(target_date) -> List[Dict[str, Any]]:
-    """Lädt IST-PV-Werte aus Influx. Nur bis zur aktuellen Uhrzeit."""
+    """Lädt IST-PV-Werte (Summe aller Producer) aus Influx."""
     actual_by_slot: Dict[tuple, float] = {}
     now_local = datetime.now(DASHBOARD_TIMEZONE)
     
@@ -732,6 +732,15 @@ def _load_actual_slots_for_date(target_date) -> List[Dict[str, Any]]:
     if target_date <= now_local.date():
         try:
             cfg = load_config()
+            producer_ids: List[str] = []
+            try:
+                producer_ids = [
+                    d.id for d in load_devices_config().devices
+                    if d.enabled and d.type == DeviceType.PRODUCER and d.id
+                ]
+            except Exception as e:
+                logger.warning(f"Konnte Producer-IDs nicht laden: {e}")
+
             start_local = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=DASHBOARD_TIMEZONE)
             
             # Bestimme Stop-Zeitpunkt
@@ -744,16 +753,23 @@ def _load_actual_slots_for_date(target_date) -> List[Dict[str, Any]]:
                 stop_utc = stop_local.astimezone(ZoneInfo("UTC")).isoformat()
             
             start_utc = start_local.astimezone(ZoneInfo("UTC")).isoformat()
+
+            device_filter = ""
+            if producer_ids:
+                filter_parts = [f'r["device_id"] == "{pid}"' for pid in producer_ids]
+                device_filter = " and (" + " or ".join(filter_parts) + ")"
             
             flux = f'''
 from(bucket: "{cfg.influxdb.bucket_raw}")
   |> range(start: {start_utc}, stop: {stop_utc})
   |> filter(fn: (r) => r["_field"] == "value")
-    |> filter(fn: (r) => (r["_measurement"] == "producer_power" or r["_measurement"] == "power") and r["device_id"] == "pv1")
+  |> filter(fn: (r) => r["_measurement"] == "producer_power"{device_filter})
 '''
             with InfluxDBClient(url=cfg.influxdb.url, token=cfg.influxdb.token, org=cfg.influxdb.org) as client:
                 query_api = client.query_api()
                 tables = query_api.query(query=flux, org=cfg.influxdb.org)
+
+                values_by_slot: Dict[tuple, Dict[str, float]] = {}
                 
                 for table in tables:
                     for record in table.records:
@@ -768,10 +784,15 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
                         minute = (local_ts.minute // 15) * 15
                         hour = local_ts.hour
                         value = _coerce_float(record.get_value())
+                        device_id = record.values.get("device_id")
                         
-                        if value is not None:
+                        if value is not None and isinstance(device_id, str) and device_id:
                             slot_key = (target_date, hour, minute)
-                            actual_by_slot[slot_key] = float(value)
+                            slot_values = values_by_slot.setdefault(slot_key, {})
+                            slot_values[device_id] = float(value)
+
+                for slot_key, slot_values in values_by_slot.items():
+                    actual_by_slot[slot_key] = round(sum(slot_values.values()), 1)
         except Exception as e:
             logger.debug(f"IST-PV aus Influx nicht verfügbar: {e}")
     
