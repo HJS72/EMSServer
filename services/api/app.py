@@ -600,15 +600,17 @@ def get_forecast_daily():
         if not forecast_data:
             return jsonify({"error": f"Forecast für {target_date} nicht verfügbar"}), 404
         
-        # Hole ioBroker-States für aktuelle PV-Leistung (nur bei heute)
+        # Hole ioBroker-States für aktuelle PV-Leistung (immer, da es sich um Echtzeit-Daten handelt)
         current_pv_w = 0
-        if target_date == datetime.utcnow().date():
+        try:
             states = get_iobroker_states_sync()
-            pv_state_id = "modbus.0.pv_power"
+            pv_state_id = "solaredgemodbus.0.PV_Leistung"
             if states.get(pv_state_id):
                 state_data = states[pv_state_id]
                 if isinstance(state_data, dict):
                     current_pv_w = state_data.get("val", 0)
+        except Exception as e:
+            logger.warning(f"Aktuelle PV-Leistung nicht verfügbar: {e}")
         
         # Generiere 24h Zeitreihe (0:00 - 23:45)
         full_slots = _generate_24h_slots(forecast_data.get("slots", []), target_date)
