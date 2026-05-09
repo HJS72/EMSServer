@@ -899,7 +899,7 @@ def _empty_consumption_hourly() -> List[Dict[str, Any]]:
     ]
 
 
-def _get_consumption_labels() -> Dict[str, str]:
+def _get_consumption_labels() -> Dict[str, Any]:
     """Liefert Label-Namen für Verbrauchsdiagramm aus der Device-Konfiguration."""
     labels = {
         "dhw": "Warmwasser",
@@ -907,6 +907,7 @@ def _get_consumption_labels() -> Dict[str, str]:
         "wallbox": "Wallbox",
         "house": "Haus",
         "forecast": "Prognose",
+        "normal_consumers": {},
     }
 
     try:
@@ -926,6 +927,13 @@ def _get_consumption_labels() -> Dict[str, str]:
         house_device = next((d for d in devices if d.id == "gesamtverbrauch"), None)
         if house_device and house_device.name:
             labels["house"] = house_device.name
+
+        # Normale Verbraucher (z.B. Waschmaschine, Trockner)
+        normal_consumers: Dict[str, str] = {}
+        for device in devices:
+            if device.type == DeviceType.CONSUMER and device.id != "gesamtverbrauch":
+                normal_consumers[device.id] = device.name or device.id
+        labels["normal_consumers"] = normal_consumers
     except Exception as e:
         logger.warning(f"Konnte Verbrauchs-Labels nicht aus Devices laden: {e}")
 
@@ -937,7 +945,8 @@ def _build_actual_consumption_hourly(target_date) -> List[Dict[str, Any]]:
 
     Rückgabe pro Intervall:
     - dhw_w, climate_w, wallbox_w: gemessene steuerbare Verbraucher
-    - consumers_total_w: Summe steuerbare Verbraucher
+    - normal_consumers_w: normale Verbraucher (nach device_id)
+    - consumers_total_w: Summe steuerbare + normale Verbraucher
     - house_w: gemessener Gesamtverbrauch Haus (Device-ID: gesamtverbrauch)
 
     Bevorzugt werden 15m-Aggregate (ems_agg). Falls fuer ein Intervall keine
@@ -981,6 +990,21 @@ def _build_actual_consumption_hourly(target_date) -> List[Dict[str, Any]]:
         for i in range(96)
     }
 
+    normal_agg: Dict[int, Dict[str, float]] = {i: {} for i in range(96)}
+    normal_counts_agg: Dict[int, Dict[str, int]] = {i: {} for i in range(96)}
+    normal_raw: Dict[int, Dict[str, float]] = {i: {} for i in range(96)}
+    normal_counts_raw: Dict[int, Dict[str, int]] = {i: {} for i in range(96)}
+    normal_consumer_ids: set[str] = set()
+
+    excluded_consumer_ids = {"gesamtverbrauch"}
+    try:
+        devices = [d for d in load_devices_config().devices if d.enabled]
+        excluded_consumer_ids.update({
+            d.id for d in devices if d.type in (DeviceType.DHW, DeviceType.CLIMATE, DeviceType.WALLBOX)
+        })
+    except Exception as e:
+        logger.warning(f"Konnte Ausschlussliste für normale Verbraucher nicht laden: {e}")
+
     try:
         cfg = load_config()
         start_local = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=DASHBOARD_TIMEZONE)
@@ -997,7 +1021,7 @@ from(bucket: "{cfg.influxdb.bucket_agg}")
     r["_measurement"] == "dhw_power" or
     r["_measurement"] == "climate_power" or
     r["_measurement"] == "wallbox_charging_power" or
-    (r["_measurement"] == "consumer_power" and r["device_id"] == "gesamtverbrauch")
+        r["_measurement"] == "consumer_power"
   )
 '''
         flux_raw = f'''
@@ -1008,7 +1032,7 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
     r["_measurement"] == "dhw_power" or
     r["_measurement"] == "climate_power" or
     r["_measurement"] == "wallbox_charging_power" or
-    (r["_measurement"] == "consumer_power" and r["device_id"] == "gesamtverbrauch")
+        r["_measurement"] == "consumer_power"
   )
 '''
 
@@ -1017,7 +1041,13 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
             tables_agg = query_api.query(query=flux_agg, org=cfg.influxdb.org)
             tables_raw = query_api.query(query=flux_raw, org=cfg.influxdb.org)
 
-        def _consume_record(record: Any, sums: Dict[int, Dict[str, float]], cnts: Dict[int, Dict[str, int]]) -> None:
+        def _consume_record(
+            record: Any,
+            sums: Dict[int, Dict[str, float]],
+            cnts: Dict[int, Dict[str, int]],
+            normal_sums: Dict[int, Dict[str, float]],
+            normal_cnts: Dict[int, Dict[str, int]],
+        ) -> None:
             ts = record.get_time()
             if ts is None:
                 return
@@ -1045,14 +1075,20 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
             elif measurement == "consumer_power" and device_id == "gesamtverbrauch":
                 sums[interval]["house_w"] += value
                 cnts[interval]["house_w"] += 1
+            elif measurement == "consumer_power" and isinstance(device_id, str) and device_id not in excluded_consumer_ids:
+                interval_normal = normal_sums[interval]
+                interval_normal[device_id] = interval_normal.get(device_id, 0.0) + value
+                interval_counts = normal_cnts[interval]
+                interval_counts[device_id] = interval_counts.get(device_id, 0) + 1
+                normal_consumer_ids.add(device_id)
 
         for table in tables_agg:
             for record in table.records:
-                _consume_record(record, quarterly, counts_agg)
+                _consume_record(record, quarterly, counts_agg, normal_agg, normal_counts_agg)
 
         for table in tables_raw:
             for record in table.records:
-                _consume_record(record, quarterly_raw, counts_raw)
+                _consume_record(record, quarterly_raw, counts_raw, normal_raw, normal_counts_raw)
     except Exception as e:
         logger.warning(f"IST-Verbrauch aus Influx nicht verfügbar: {e}")
 
@@ -1065,6 +1101,13 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
             return round(quarterly_raw[interval][key] / counts_raw[interval][key], 1)
         return 0.0
 
+    def _avg_normal_with_fallback(interval: int, device_id: str) -> float:
+        if normal_counts_agg[interval].get(device_id, 0) > 0:
+            return round(normal_agg[interval][device_id] / normal_counts_agg[interval][device_id], 1)
+        if normal_counts_raw[interval].get(device_id, 0) > 0:
+            return round(normal_raw[interval][device_id] / normal_counts_raw[interval][device_id], 1)
+        return 0.0
+
     for interval in range(96):
         hour = interval // 4
         minute = (interval % 4) * 15
@@ -1072,7 +1115,16 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
         climate_w = _avg_with_fallback(interval, "climate_w")
         wallbox_w = _avg_with_fallback(interval, "wallbox_w")
         house_w = _avg_with_fallback(interval, "house_w")
-        consumers_total_w = round(dhw_w + climate_w + wallbox_w, 1)
+
+        normal_consumers_w: Dict[str, float] = {}
+        normal_total_w = 0.0
+        for device_id in sorted(normal_consumer_ids):
+            value = _avg_normal_with_fallback(interval, device_id)
+            if value > 0:
+                normal_consumers_w[device_id] = value
+                normal_total_w += value
+
+        consumers_total_w = round(dhw_w + climate_w + wallbox_w + normal_total_w, 1)
         result.append(
             {
                 "hour": hour,
@@ -1080,6 +1132,8 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
                 "dhw_w": dhw_w,
                 "climate_w": climate_w,
                 "wallbox_w": wallbox_w,
+                "normal_consumers_w": normal_consumers_w,
+                "normal_total_w": round(normal_total_w, 1),
                 "consumers_total_w": consumers_total_w,
                 "house_w": house_w,
             }

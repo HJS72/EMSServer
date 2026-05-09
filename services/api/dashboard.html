@@ -671,12 +671,25 @@
             const wallboxName = consumptionLabels.wallbox || 'Wallbox';
             const houseName = consumptionLabels.house || 'Haus';
             const forecastName = consumptionLabels.forecast || 'Prognose';
+            const normalConsumerLabels = consumptionLabels.normal_consumers || {};
             
             const labels = actualHourly.map(item => item.label);
             const dhwActualValues = actualHourly.map(item => item.dhw_w || 0);
             const climateActualValues = actualHourly.map(item => item.climate_w || 0);
             const wallboxActualValues = actualHourly.map(item => item.wallbox_w || 0);
             const houseActualValues = actualHourly.map(item => item.house_w || 0);
+
+            const normalConsumerIdSet = new Set(Object.keys(normalConsumerLabels));
+            actualHourly.forEach(item => {
+                const consumers = item.normal_consumers_w || {};
+                Object.keys(consumers).forEach(id => normalConsumerIdSet.add(id));
+            });
+            const normalConsumerIds = Array.from(normalConsumerIdSet)
+                .sort((a, b) => {
+                    const nameA = normalConsumerLabels[a] || a;
+                    const nameB = normalConsumerLabels[b] || b;
+                    return nameA.localeCompare(nameB, 'de-DE');
+                });
             
             const forecastByTime = new Map(forecastHourly.map(item => [
                 `${String(normalizeHour(item.hour)).padStart(2, '0')}:00`,
@@ -685,6 +698,37 @@
             const forecastTotalValues = labels.map(lbl => {
                 const match = forecastByTime.get(lbl);
                 return match ? (match.total_w || 0) : 0;
+            });
+
+            const normalConsumerPalette = [
+                ['rgb(217, 119, 6)', 'rgba(217, 119, 6, 0.45)'],
+                ['rgb(220, 38, 38)', 'rgba(220, 38, 38, 0.42)'],
+                ['rgb(124, 58, 237)', 'rgba(124, 58, 237, 0.40)'],
+                ['rgb(2, 132, 199)', 'rgba(2, 132, 199, 0.38)'],
+                ['rgb(21, 128, 61)', 'rgba(21, 128, 61, 0.38)'],
+                ['rgb(190, 24, 93)', 'rgba(190, 24, 93, 0.36)'],
+                ['rgb(6, 95, 70)', 'rgba(6, 95, 70, 0.35)'],
+            ];
+
+            const normalConsumerDatasets = normalConsumerIds.map((deviceId, idx) => {
+                const [lineColor, fillColor] = normalConsumerPalette[idx % normalConsumerPalette.length];
+                const label = normalConsumerLabels[deviceId] || deviceId;
+                return {
+                    label,
+                    data: actualHourly.map(item => (item.normal_consumers_w && item.normal_consumers_w[deviceId]) || 0),
+                    borderColor: lineColor,
+                    backgroundColor: fillColor,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                    pointBackgroundColor: lineColor,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 1,
+                    stack: 'ist_consumers',
+                    order: 4,
+                };
             });
 
             if (consumptionChart) {
@@ -760,6 +804,7 @@
                             stack: 'ist_consumers',
                             order: 4,
                         },
+                        ...normalConsumerDatasets,
                         {
                             label: forecastName,
                             data: forecastTotalValues,
@@ -812,7 +857,7 @@
                                     const prognose = items
                                         .filter(item => item.dataset.label === forecastName)
                                         .reduce((sum, item) => sum + (item.parsed?.y || 0), 0);
-                                    return `${dhwName}/${climateName}/${wallboxName}: ${istConsumer.toLocaleString('de-DE')} W | ${houseName}: ${istHouse.toLocaleString('de-DE')} W | ${forecastName}: ${prognose.toLocaleString('de-DE')} W`;
+                                    return `Gestackte Verbraucher: ${istConsumer.toLocaleString('de-DE')} W | ${houseName}: ${istHouse.toLocaleString('de-DE')} W | ${forecastName}: ${prognose.toLocaleString('de-DE')} W`;
                                 }
                             }
                         }
