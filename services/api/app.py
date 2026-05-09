@@ -127,7 +127,6 @@ def _load_forecast_location() -> Dict[str, Any]:
     }
     if not FORECAST_CONFIG_FILE.exists():
         return location
-
     try:
         raw = json.loads(FORECAST_CONFIG_FILE.read_text())
         source = raw.get("open_meteo", raw) if isinstance(raw, dict) else {}
@@ -586,6 +585,8 @@ def get_forecast_daily():
     
     Query-Parameter:
     - date: YYYY-MM-DD (default: heute)
+    
+    Falls Forecast nicht verfügbar: Gibt minimal empty forecast mit actual_slots zurück.
     """
     try:
         # Parse optionales Datum
@@ -595,10 +596,16 @@ def get_forecast_daily():
         else:
             target_date = datetime.utcnow().date()
         
-        # Lade Forecast für das angeforderte Datum
+        # Lade Forecast für das angeforderte Datum (optional)
         forecast_data = _load_forecast_for_date(target_date)
         if not forecast_data:
-            return jsonify({"error": f"Forecast für {target_date} nicht verfügbar"}), 404
+            # Kein Forecast vorhanden - nutze Minimal-Struktur
+            forecast_data = {
+                "slots": [],
+                "provider": "none",
+                "generated_at": None,
+                "model": "none",
+            }
         
         # Hole ioBroker-States für aktuelle PV-Leistung (immer, da es sich um Echtzeit-Daten handelt)
         current_pv_w = 0
@@ -652,13 +659,14 @@ def _load_forecast_for_date(target_date) -> Optional[Dict[str, Any]]:
         if _forecast_contains_date(current_forecast, target_date):
             return current_forecast
     
-    # Für andere Tage: versuche Archive
-    archive_path = Path("/etc/ems/archive")
-    if archive_path.exists():
-        archive_file = archive_path / f"forecast-{target_date.isoformat()}.json"
-        if archive_file.exists():
-            with open(archive_file) as f:
-                return json.load(f)
+    # Für andere Tage: versuche Archive (mehrere mögliche Pfade)
+    for archive_base in ["/etc/ems/archive", "/opt/ems/EMSServer/data/archive"]:
+        archive_path = Path(archive_base)
+        if archive_path.exists():
+            archive_file = archive_path / f"forecast-{target_date.isoformat()}.json"
+            if archive_file.exists():
+                with open(archive_file) as f:
+                    return json.load(f)
     
     return None
 
@@ -716,47 +724,86 @@ def _generate_24h_slots(slots: List[Dict[str, Any]], target_date) -> List[Dict[s
 
 
 def _load_actual_slots_for_date(target_date) -> List[Dict[str, Any]]:
-    """Lädt IST-PV-Werte aus der Lernhistorie und richtet sie auf 24h aus."""
-    if not FORECAST_HISTORY_FILE.exists():
-        return _empty_actual_slots(target_date)
-
-    try:
-        data = json.loads(FORECAST_HISTORY_FILE.read_text())
-    except Exception:
-        return _empty_actual_slots(target_date)
-
-    if not isinstance(data, list):
-        return _empty_actual_slots(target_date)
-
+    """Lädt IST-PV-Werte aus Influx. Nur bis zur aktuellen Uhrzeit."""
     actual_by_slot: Dict[tuple, float] = {}
-    for item in data:
-        if not isinstance(item, dict):
-            continue
-        slot_key = _slot_local_key(item.get("ts"))
-        actual_pv_w = item.get("actual_pv_w")
-        if slot_key is None or slot_key[0] != target_date or actual_pv_w is None:
-            continue
+    now_local = datetime.now(DASHBOARD_TIMEZONE)
+    
+    # Lade Daten für heute und Vergangenheit
+    if target_date <= now_local.date():
         try:
-            actual_by_slot[slot_key] = float(actual_pv_w)
-        except (TypeError, ValueError):
-            continue
-
+            cfg = load_config()
+            start_local = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=DASHBOARD_TIMEZONE)
+            
+            # Bestimme Stop-Zeitpunkt
+            if target_date == now_local.date():
+                # Heute: nur bis jetzt
+                stop_utc = now_local.astimezone(ZoneInfo("UTC")).isoformat()
+            else:
+                # Vergangenheit: ganzer Tag
+                stop_local = start_local + timedelta(days=1)
+                stop_utc = stop_local.astimezone(ZoneInfo("UTC")).isoformat()
+            
+            start_utc = start_local.astimezone(ZoneInfo("UTC")).isoformat()
+            
+            flux = f'''
+from(bucket: "{cfg.influxdb.bucket_raw}")
+  |> range(start: {start_utc}, stop: {stop_utc})
+  |> filter(fn: (r) => r["_field"] == "value")
+  |> filter(fn: (r) => r["_measurement"] == "power" and r["device_id"] == "pv1")
+'''
+            with InfluxDBClient(url=cfg.influxdb.url, token=cfg.influxdb.token, org=cfg.influxdb.org) as client:
+                query_api = client.query_api()
+                tables = query_api.query(query=flux, org=cfg.influxdb.org)
+                
+                for table in tables:
+                    for record in table.records:
+                        ts = record.get_time()
+                        if ts is None:
+                            continue
+                        local_ts = ts.astimezone(DASHBOARD_TIMEZONE)
+                        if local_ts.date() != target_date:
+                            continue
+                        
+                        # Runde auf 15-Minuten-Slot
+                        minute = (local_ts.minute // 15) * 15
+                        hour = local_ts.hour
+                        value = _coerce_float(record.get_value())
+                        
+                        if value is not None:
+                            slot_key = (target_date, hour, minute)
+                            actual_by_slot[slot_key] = float(value)
+        except Exception as e:
+            logger.debug(f"IST-PV aus Influx nicht verfügbar: {e}")
+    
     return _empty_actual_slots(target_date, actual_by_slot)
 
 
 def _empty_actual_slots(target_date, actual_by_slot: Optional[Dict[tuple, float]] = None) -> List[Dict[str, Any]]:
-    """Erzeugt 96 Slots fuer einen Tag; fehlende IST-Werte bleiben null."""
+    """Erzeugt 96 Slots fuer einen Tag; nur bis jetzt gefuellt, sonst null."""
     from datetime import time
 
     actual_map = actual_by_slot or {}
     result: List[Dict[str, Any]] = []
+    now_local = datetime.now(DASHBOARD_TIMEZONE)
+    
     for hour in range(24):
         for minute in [0, 15, 30, 45]:
             dt = datetime.combine(target_date, time(hour=hour, minute=minute)).replace(tzinfo=DASHBOARD_TIMEZONE)
             ts = dt.isoformat()
+            
+            # Bestimme ob Wert geladen werden soll
+            pv_w = None
+            if target_date < now_local.date():
+                # Vergangenheit: alle verfuegbaren Werte laden
+                pv_w = actual_map.get((target_date, hour, minute))
+            elif target_date == now_local.date() and dt <= now_local:
+                # Heute bis jetzt: Werte laden
+                pv_w = actual_map.get((target_date, hour, minute))
+            # sonst: null (Zukunft oder nach aktuellem Zeitpunkt heute)
+            
             result.append({
                 "ts": ts,
-                "pv_w": actual_map.get((target_date, hour, minute)),
+                "pv_w": pv_w,
             })
     return result
 
