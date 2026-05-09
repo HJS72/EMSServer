@@ -269,6 +269,11 @@
             <div class="chart-title">Verbrauchsprognose: Verbraucher gestackt (IST 15min-Intervalle, Prognose stündlich)</div>
             <canvas id="consumptionChart"></canvas>
         </div>
+
+        <div class="chart-container">
+            <div class="chart-title">Autarkie &amp; Netzbilanz: Eigenverbrauchsquote und Netz-Ein/Auszahlung (IST 15min-Intervalle)</div>
+            <canvas id="autarkieChart"></canvas>
+        </div>
         
         <div class="footer">
             <p>Daten von Open-Meteo · Kalibrierung mit historischen Messwerten · Aktualisiert alle 15 Minuten</p>
@@ -278,6 +283,7 @@
     <script>
         let chart = null;
         let consumptionChart = null;
+        let autarkieChart = null;
         let currentDate = startOfLocalDay(new Date());
         const MAX_DAYS_AHEAD = 1;
 
@@ -371,6 +377,7 @@
                 updateMetrics(data);
                 renderForecastChart(data);
                 renderConsumptionChart(data);
+                renderAutarkieChart(data);
                 
                 document.getElementById('status-badge').className = 'status-badge ok';
                 document.getElementById('status-badge').textContent = '✓ Aktiv';
@@ -874,6 +881,128 @@
                                 color: 'rgba(0, 0, 0, 0.05)',
                                 drawBorder: false,
                             }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderAutarkieChart(data) {
+            const ctx = document.getElementById('autarkieChart').getContext('2d');
+            if (autarkieChart) { autarkieChart.destroy(); autarkieChart = null; }
+
+            const slots = data.consumption_actual_hourly || [];
+            const labels = slots.map(s => s.label);
+
+            // Autarkie % (0-100, null wenn keine Daten)
+            const autarkieValues = slots.map(s => s.autarkie_pct ?? null);
+            // Netzbezug: max(0, grid_w)
+            const netzbezugValues = slots.map(s => s.grid_w != null ? Math.max(0, s.grid_w) : null);
+            // Einspeisung: max(0, -grid_w) als positive Werte
+            const einspeisungValues = slots.map(s => s.grid_w != null ? Math.max(0, -s.grid_w) : null);
+
+            autarkieChart = new Chart(ctx, {
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'Autarkie %',
+                            data: autarkieValues,
+                            borderColor: 'rgb(22, 163, 74)',
+                            backgroundColor: 'rgba(22, 163, 74, 0.15)',
+                            borderWidth: 2.5,
+                            fill: true,
+                            tension: 0.3,
+                            spanGaps: true,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            yAxisID: 'yPct',
+                            order: 1,
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Netzbezug',
+                            data: netzbezugValues,
+                            backgroundColor: 'rgba(239, 68, 68, 0.65)',
+                            borderColor: 'rgb(239, 68, 68)',
+                            borderWidth: 0,
+                            yAxisID: 'yW',
+                            order: 3,
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Einspeisung',
+                            data: einspeisungValues,
+                            backgroundColor: 'rgba(251, 191, 36, 0.65)',
+                            borderColor: 'rgb(251, 191, 36)',
+                            borderWidth: 0,
+                            yAxisID: 'yW',
+                            order: 2,
+                        },
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: true, position: 'top', labels: { font: { size: 12 }, padding: 16 } },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(255,255,255,0.95)',
+                            titleColor: '#333',
+                            bodyColor: '#555',
+                            borderColor: '#ddd',
+                            borderWidth: 1,
+                            padding: 12,
+                            callbacks: {
+                                label: function(context) {
+                                    const val = context.parsed?.y;
+                                    if (val == null) return context.dataset.label + ': -';
+                                    if (context.dataset.yAxisID === 'yPct') {
+                                        return context.dataset.label + ': ' + val.toLocaleString('de-DE', {maximumFractionDigits: 1}) + ' %';
+                                    }
+                                    return context.dataset.label + ': ' + val.toLocaleString('de-DE') + ' W';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                font: { size: 11 }, color: '#999',
+                                maxRotation: 0, autoSkip: true, maxTicksLimit: 24,
+                                callback: function(value) {
+                                    const label = this.getLabelForValue(value);
+                                    return isFullHourLabel(label) ? label : '';
+                                }
+                            },
+                            grid: { display: false }
+                        },
+                        yPct: {
+                            type: 'linear',
+                            position: 'left',
+                            min: 0,
+                            max: 100,
+                            ticks: {
+                                font: { size: 12 }, color: 'rgb(22, 163, 74)',
+                                callback: v => v + ' %'
+                            },
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            title: { display: true, text: 'Autarkie', color: 'rgb(22, 163, 74)', font: { size: 12 } }
+                        },
+                        yW: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            ticks: {
+                                font: { size: 12 }, color: '#999',
+                                callback: v => v.toLocaleString('de-DE') + ' W'
+                            },
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Netz W', color: '#999', font: { size: 12 } }
                         }
                     }
                 }
