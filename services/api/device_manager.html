@@ -481,6 +481,38 @@
             background: #f5f5f5;
             border-radius: 8px;
         }
+
+        .live-value {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 5px;
+            font-size: 12px;
+            color: #374151;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            border-radius: 5px;
+            padding: 3px 9px;
+            font-family: monospace;
+        }
+
+        .live-value.stale {
+            background: #f9fafb;
+            border-color: #d1d5db;
+            color: #6b7280;
+        }
+
+        .live-value-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #10b981;
+            flex-shrink: 0;
+        }
+
+        .live-value.stale .live-value-dot {
+            background: #d1d5db;
+        }
         
         .empty-state {
             text-align: center;
@@ -542,6 +574,7 @@
         let allDevices = [];
         let deviceTypes = [];
         let iobrokerStates = [];
+        let liveValues = {};  // { stateId: {val, unit} }
         let pickerMeasurementKey = null;
 
         const CONTROL_DEVICE_LAYOUTS = {
@@ -656,6 +689,37 @@
                 currentDevice = { ...device };
                 renderEditor();
                 renderDeviceList();
+                loadLiveValuesForDevice(device);
+            }
+        }
+
+        async function loadLiveValuesForDevice(device) {
+            const ids = Object.values(device.measurements || {})
+                .map(m => m.iobroker_id)
+                .filter(id => id && typeof id === 'string');
+            if (ids.length === 0) return;
+            try {
+                const res = await fetch(`${API_BASE}/iobroker/values`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids })
+                });
+                if (!res.ok) return;
+                liveValues = await res.json();
+                // Update all live-value badges in DOM without re-rendering
+                ids.forEach(stateId => {
+                    const badge = document.querySelector(`[data-live-id="${CSS.escape(stateId)}"]`);
+                    if (!badge) return;
+                    const info = liveValues[stateId];
+                    if (info !== undefined) {
+                        const unit = info.unit ? ` ${info.unit}` : '';
+                        const display = info.val === null || info.val === undefined ? '\u2013' : String(info.val);
+                        badge.innerHTML = `<span class="live-value-dot"></span>${display}${unit}`;
+                        badge.classList.remove('stale');
+                    }
+                });
+            } catch (e) {
+                console.warn('Live-Values konnten nicht geladen werden:', e);
             }
         }
 
@@ -953,6 +1017,7 @@
                                            placeholder="z.B. solaredgemodbus.0.PV_Leistung">
                                     <button type="button" class="btn btn-secondary btn-sm" onclick="openStatePicker('${key}')">Auswaehlen</button>
                                 </div>
+                                ${liveValueBadge(meas.iobroker_id)}
                             </div>
                             <div>
                                 <label>Einheit</label>
@@ -1028,6 +1093,13 @@
             msgEl.textContent = msg;
             container.appendChild(msgEl);
             setTimeout(() => msgEl.remove(), 5000);
+        }
+
+        function liveValueBadge(stateId) {
+            if (!stateId) return '';
+            // Use data attribute so DOM can be updated without re-render
+            const escaped = stateId.replace(/"/g, '&quot;');
+            return `<div class="live-value stale" data-live-id="${escaped}"><span class="live-value-dot"></span>lade&hellip;</div>`;
         }
 
         // Init on load

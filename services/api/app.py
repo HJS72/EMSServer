@@ -466,6 +466,34 @@ def list_iobroker_states():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/iobroker/values", methods=["POST"])
+def get_iobroker_values():
+    """Liefert aktuelle Werte für eine Liste von State-IDs.
+
+    Body: {"ids": ["state.id.1", "state.id.2", ...]}
+    Response: {"state.id.1": {"val": 42, "unit": "W"}, ...}
+    """
+    try:
+        ids = (request.json or {}).get("ids", [])
+        if not ids or not isinstance(ids, list):
+            return jsonify({}), 200
+        states = get_iobroker_states_sync()
+        result = {}
+        for state_id in ids:
+            state_data = states.get(state_id)
+            if isinstance(state_data, dict):
+                common = state_data.get("common", {}) if isinstance(state_data.get("common"), dict) else {}
+                result[state_id] = {
+                    "val": state_data.get("val"),
+                    "unit": common.get("unit", ""),
+                    "name": common.get("name", ""),
+                }
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Fehler beim Abrufen von ioBroker-Values: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/iobroker/search", methods=["GET"])
 def search_iobroker():
     """ioBroker States nach Muster suchen."""
