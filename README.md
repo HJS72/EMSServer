@@ -70,13 +70,13 @@ Details siehe:
 
 ```bash
 # Status
-ssh root@10.13.30.220 'systemctl status ems-collector'
+ssh ems-root-220 'systemctl status ems-collector'
 
 # Logs live
-ssh root@10.13.30.220 'journalctl -u ems-collector -f'
+ssh ems-root-220 'journalctl -u ems-collector -f'
 
 # Neustart
-ssh root@10.13.30.220 'systemctl restart ems-collector'
+ssh ems-root-220 'systemctl restart ems-collector'
 ```
 
 ### Konfiguration
