@@ -894,8 +894,9 @@
             const slots = data.consumption_actual_hourly || [];
             const labels = slots.map(s => s.label);
 
-            // Autarkie % (0-100, null wenn keine Daten)
-            const autarkieValues = slots.map(s => s.autarkie_pct ?? null);
+            // Autarkie-Anteile in % (0-100)
+            const autarkiePvValues = slots.map(s => s.autarkie_pv_pct ?? null);
+            const autarkieBattValues = slots.map(s => s.autarkie_batt_pct ?? null);
             // Hausverbrauch
             const houseValues = slots.map(s => s.house_w ?? null);
             // Netzbezug: max(0, grid_w)
@@ -908,19 +909,26 @@
                     labels,
                     datasets: [
                         {
-                            type: 'line',
-                            label: 'PV-Strom %',
-                            data: autarkieValues,
+                            type: 'bar',
+                            label: 'Autarkie aus PV %',
+                            data: autarkiePvValues,
+                            backgroundColor: 'rgba(22, 163, 74, 0.75)',
                             borderColor: 'rgb(22, 163, 74)',
-                            backgroundColor: 'rgba(22, 163, 74, 0.15)',
-                            borderWidth: 2.5,
-                            fill: true,
-                            tension: 0.3,
-                            spanGaps: true,
-                            pointRadius: 0,
-                            pointHoverRadius: 4,
+                            borderWidth: 0,
+                            stack: 'autarkie-pct',
                             yAxisID: 'yPct',
-                            order: 1,
+                            order: 6,
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Autarkie aus Batterie %',
+                            data: autarkieBattValues,
+                            backgroundColor: 'rgba(5, 150, 105, 0.75)',
+                            borderColor: 'rgb(5, 150, 105)',
+                            borderWidth: 0,
+                            stack: 'autarkie-pct',
+                            yAxisID: 'yPct',
+                            order: 6,
                         },
                         {
                             type: 'line',
@@ -1015,12 +1023,13 @@
                             position: 'left',
                             min: 0,
                             max: 100,
+                            stacked: true,
                             ticks: {
                                 font: { size: 12 }, color: 'rgb(22, 163, 74)',
                                 callback: v => v + ' %'
                             },
                             grid: { color: 'rgba(0,0,0,0.05)' },
-                            title: { display: true, text: 'PV-Strom %', color: 'rgb(22, 163, 74)', font: { size: 12 } }
+                            title: { display: true, text: 'Autarkie % (PV + Batterie)', color: 'rgb(22, 163, 74)', font: { size: 12 } }
                         },
                         yW: {
                             type: 'linear',

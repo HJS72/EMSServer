@@ -1014,6 +1014,7 @@ def _build_actual_consumption_hourly(target_date) -> List[Dict[str, Any]]:
             "wallbox_w": 0.0,
             "house_w": 0.0,
             "grid_w": 0.0,
+            "battery_w": 0.0,
         }
         for i in range(96)
     }
@@ -1024,6 +1025,7 @@ def _build_actual_consumption_hourly(target_date) -> List[Dict[str, Any]]:
             "wallbox_w": 0,
             "house_w": 0,
             "grid_w": 0,
+            "battery_w": 0,
         }
         for i in range(96)
     }
@@ -1034,6 +1036,7 @@ def _build_actual_consumption_hourly(target_date) -> List[Dict[str, Any]]:
             "wallbox_w": 0.0,
             "house_w": 0.0,
             "grid_w": 0.0,
+            "battery_w": 0.0,
         }
         for i in range(96)
     }
@@ -1044,6 +1047,7 @@ def _build_actual_consumption_hourly(target_date) -> List[Dict[str, Any]]:
             "wallbox_w": 0,
             "house_w": 0,
             "grid_w": 0,
+            "battery_w": 0,
         }
         for i in range(96)
     }
@@ -1080,7 +1084,9 @@ from(bucket: "{cfg.influxdb.bucket_agg}")
     r["_measurement"] == "climate_power" or
     r["_measurement"] == "wallbox_charging_power" or
     r["_measurement"] == "consumer_power" or
-    r["_measurement"] == "grid_power"
+        r["_measurement"] == "grid_power" or
+        r["_measurement"] == "hybrid_batt_power" or
+        r["_measurement"] == "battery_power"
   )
 '''
         flux_raw = f'''
@@ -1092,7 +1098,9 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
     r["_measurement"] == "climate_power" or
     r["_measurement"] == "wallbox_charging_power" or
     r["_measurement"] == "consumer_power" or
-    r["_measurement"] == "grid_power"
+        r["_measurement"] == "grid_power" or
+        r["_measurement"] == "hybrid_batt_power" or
+        r["_measurement"] == "battery_power"
   )
 '''
 
@@ -1138,6 +1146,9 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
             elif measurement == "grid_power":
                 sums[interval]["grid_w"] += value
                 cnts[interval]["grid_w"] += 1
+            elif measurement in ("hybrid_batt_power", "battery_power"):
+                sums[interval]["battery_w"] += value
+                cnts[interval]["battery_w"] += 1
             elif measurement == "consumer_power" and isinstance(device_id, str) and device_id not in excluded_consumer_ids:
                 interval_normal = normal_sums[interval]
                 interval_normal[device_id] = interval_normal.get(device_id, 0.0) + value
@@ -1178,6 +1189,7 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
         climate_w = _avg_with_fallback(interval, "climate_w")
         wallbox_w = _avg_with_fallback(interval, "wallbox_w")
         house_w = _avg_with_fallback(interval, "house_w")
+        battery_w = _avg_with_fallback(interval, "battery_w")
 
         normal_consumers_w: Dict[str, float] = {}
         normal_total_w = 0.0
@@ -1195,12 +1207,20 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
         # grid_w > 0: Netzbezug, grid_w < 0: Einspeisung
         if house_w > 0 and grid_w is not None:
             netzbezug = max(0.0, grid_w)
-            eigenverbrauch = max(0.0, house_w - netzbezug)
-            autarkie_pct = round(min(100.0, eigenverbrauch / house_w * 100), 1)
+            eigenversorgung = max(0.0, house_w - netzbezug)
+            batterie_anteil_w = min(max(0.0, battery_w), eigenversorgung)
+            pv_anteil_w = max(0.0, eigenversorgung - batterie_anteil_w)
+            autarkie_pct = round(min(100.0, eigenversorgung / house_w * 100), 1)
+            autarkie_batt_pct = round(min(100.0, batterie_anteil_w / house_w * 100), 1)
+            autarkie_pv_pct = round(min(100.0, pv_anteil_w / house_w * 100), 1)
         elif house_w > 0:
             autarkie_pct = None
+            autarkie_batt_pct = None
+            autarkie_pv_pct = None
         else:
             autarkie_pct = None
+            autarkie_batt_pct = None
+            autarkie_pv_pct = None
         consumers_total_w = round(dhw_w + climate_w + wallbox_w + normal_total_w, 1)
         result.append(
             {
@@ -1213,8 +1233,11 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
                 "normal_total_w": round(normal_total_w, 1),
                 "consumers_total_w": consumers_total_w,
                 "house_w": house_w,
+                "battery_w": battery_w,
                 "grid_w": grid_w,
                 "autarkie_pct": autarkie_pct,
+                "autarkie_batt_pct": autarkie_batt_pct,
+                "autarkie_pv_pct": autarkie_pv_pct,
             }
         )
 
