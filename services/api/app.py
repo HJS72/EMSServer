@@ -735,6 +735,7 @@ def _generate_24h_slots(slots: List[Dict[str, Any]], target_date, history_map: O
                     "ts": slot["ts"],
                     "pv_w": slot.get("pv_w", 0),
                     "surplus_w": slot.get("surplus_w", 0),
+                    "base_load_w": slot.get("base_load_w", 0),
                 })
             else:
                 # Fallback: historische Vorhersage aus History-Datei, sonst 0W
@@ -743,6 +744,7 @@ def _generate_24h_slots(slots: List[Dict[str, Any]], target_date, history_map: O
                     "ts": dt_local.isoformat(),
                     "pv_w": round(history_pv_w, 1),
                     "surplus_w": 0,
+                    "base_load_w": 0,
                 })
     
     return result
@@ -904,6 +906,7 @@ def _build_consumption_hourly(forecast_slots: List[Dict[str, Any]]) -> List[Dict
             "dhw_w": 0.0,
             "climate_w": 0.0,
             "wallbox_w": 0.0,
+            "base_load_w": 0.0,
         }
         for hour in range(24)
     }
@@ -919,12 +922,23 @@ def _build_consumption_hourly(forecast_slots: List[Dict[str, Any]]) -> List[Dict
         hourly[hour]["wallbox_w"] += float(slot.wallbox_power_w or 0.0)
         counts[hour] += 1
 
+    # Grundlast aus Forecast-Slots auf Stundenmittel aggregieren.
+    for slot in forecast_slots:
+        slot_key = _slot_local_key(slot.get("ts"))
+        if slot_key is None:
+            continue
+        _, hour, _ = slot_key
+        base_load_w = float(slot.get("base_load_w") or 0.0)
+        hourly[hour]["base_load_w"] += base_load_w
+
     result_items: List[Dict[str, Any]] = []
     for hour in range(24):
         divisor = counts[hour] or 1
         dhw_w = round(hourly[hour]["dhw_w"] / divisor, 1)
         climate_w = round(hourly[hour]["climate_w"] / divisor, 1)
         wallbox_w = round(hourly[hour]["wallbox_w"] / divisor, 1)
+        base_load_w = round(hourly[hour]["base_load_w"] / divisor, 1)
+        total_w = round(dhw_w + climate_w + wallbox_w + base_load_w, 1)
         result_items.append(
             {
                 "hour": hour,
@@ -932,7 +946,8 @@ def _build_consumption_hourly(forecast_slots: List[Dict[str, Any]]) -> List[Dict
                 "dhw_w": dhw_w,
                 "climate_w": climate_w,
                 "wallbox_w": wallbox_w,
-                "total_w": round(dhw_w + climate_w + wallbox_w, 1),
+                "base_load_w": base_load_w,
+                "total_w": total_w,
             }
         )
 
@@ -947,6 +962,7 @@ def _empty_consumption_hourly() -> List[Dict[str, Any]]:
             "dhw_w": 0.0,
             "climate_w": 0.0,
             "wallbox_w": 0.0,
+            "base_load_w": 0.0,
             "total_w": 0.0,
         }
         for hour in range(24)

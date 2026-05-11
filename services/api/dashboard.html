@@ -676,7 +676,8 @@
                 item
             ]));
             const forecastTotalValues = labels.map(lbl => {
-                const match = forecastByTime.get(lbl);
+                const hourKey = `${String(parseInt(lbl.split(':')[0], 10)).padStart(2, '0')}:00`;
+                const match = forecastByTime.get(hourKey);
                 return match ? (match.total_w || 0) : 0;
             });
 
