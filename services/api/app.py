@@ -185,10 +185,9 @@ def _merge_control_devices(config: Dict[str, Any]) -> Dict[str, Any]:
                 section_cfg["command_state_id"] = command_state_id
             if status_state_id and not section_cfg.get("status_state_id"):
                 section_cfg["status_state_id"] = status_state_id
-            if "temp_current_c" not in section_cfg:
-                live_temp = _coerce_float(_state_value_from_snapshot(states, temp_state_id))
-                if live_temp is not None:
-                    section_cfg["temp_current_c"] = live_temp
+            live_temp = _coerce_float(_state_value_from_snapshot(states, temp_state_id))
+            if live_temp is not None:
+                section_cfg["temp_current_c"] = live_temp
 
         elif section == "climate":
             command_state_id = _measurement_iobroker_id(device, "enabled")
@@ -199,10 +198,9 @@ def _merge_control_devices(config: Dict[str, Any]) -> Dict[str, Any]:
                 section_cfg["command_state_id"] = command_state_id
             if status_state_id and not section_cfg.get("status_state_id"):
                 section_cfg["status_state_id"] = status_state_id
-            if "temp_current_c" not in section_cfg:
-                live_temp = _coerce_float(_state_value_from_snapshot(states, temp_state_id))
-                if live_temp is not None:
-                    section_cfg["temp_current_c"] = live_temp
+            live_temp = _coerce_float(_state_value_from_snapshot(states, temp_state_id))
+            if live_temp is not None:
+                section_cfg["temp_current_c"] = live_temp
 
         elif section == "wallbox":
             command_state_id = _measurement_iobroker_id(device, "enabled")
@@ -213,10 +211,9 @@ def _merge_control_devices(config: Dict[str, Any]) -> Dict[str, Any]:
                 section_cfg["command_state_id"] = command_state_id
             if status_state_id and not section_cfg.get("status_state_id"):
                 section_cfg["status_state_id"] = status_state_id
-            if "vehicle_soc_pct" not in section_cfg:
-                live_soc = _coerce_float(_state_value_from_snapshot(states, soc_state_id))
-                if live_soc is not None:
-                    section_cfg["vehicle_soc_pct"] = live_soc
+            live_soc = _coerce_float(_state_value_from_snapshot(states, soc_state_id))
+            if live_soc is not None:
+                section_cfg["vehicle_soc_pct"] = live_soc
 
     return config
 
@@ -659,7 +656,7 @@ def get_forecast_daily():
             "forecast_location": _load_forecast_location(),
             "forecast_slots": full_slots,
             "actual_slots": _load_actual_slots_for_date(target_date),
-            "consumption_hourly": _build_consumption_hourly(full_slots),
+            "consumption_hourly": _build_consumption_hourly(full_slots, target_date),
             "consumption_actual_hourly": actual_consumption_hourly,
             "consumption_labels": _get_consumption_labels(),
             "current_pv_w": current_pv_w,
@@ -906,18 +903,37 @@ def _slot_local_key(ts_value: Any) -> Optional[tuple]:
     return (local_dt.date(), local_dt.hour, local_dt.minute)
 
 
-def _build_consumption_hourly(forecast_slots: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _build_consumption_hourly(forecast_slots: List[Dict[str, Any]], target_date) -> List[Dict[str, Any]]:
     """Aggregiert den bestehenden Control-Plan auf stündliche, gestackte Verbraucherwerte."""
     try:
         base = load_control_config()
         merged = dict(base)
-        merged["slots"] = [
-            {
-                "ts": slot.get("ts"),
-                "surplus_w": slot.get("surplus_w", 0.0),
-            }
-            for slot in forecast_slots
-        ]
+        now_local = datetime.now(DASHBOARD_TIMEZONE)
+        merged_slots: List[Dict[str, Any]] = []
+        for slot in forecast_slots:
+            ts = slot.get("ts")
+            slot_key = _slot_local_key(ts)
+            if slot_key is None:
+                continue
+
+            slot_date, slot_hour, slot_minute = slot_key
+            slot_dt_local = datetime.combine(slot_date, datetime.min.time()).replace(
+                tzinfo=DASHBOARD_TIMEZONE
+            ) + timedelta(hours=slot_hour, minutes=slot_minute)
+
+            # Für heute nur verbleibende Slots ab jetzt planen.
+            if target_date == now_local.date() and slot_dt_local < now_local:
+                continue
+
+            merged_slots.append(
+                {
+                    "ts": ts,
+                    "surplus_w": slot.get("surplus_w", 0.0),
+                    "temp_c": slot.get("temp_c"),
+                }
+            )
+
+        merged["slots"] = merged_slots
         merged.setdefault("iobroker_host", IOBROKER_HOST)
         merged.setdefault("iobroker_port", IOBROKER_PORT)
         merged["publish_to_iobroker"] = False
