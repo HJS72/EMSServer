@@ -18,7 +18,7 @@ class ForecastSlot(BaseModel):
 
 class WaterHeatPumpConfig(BaseModel):
     enabled: bool = True
-    power_w: float = 1200.0
+    power_w: float = 600.0
     temp_current_c: float = 50.0
     temp_min_c: float = 47.0
     temp_max_c: float = 58.0
