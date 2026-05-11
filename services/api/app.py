@@ -1182,6 +1182,8 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
             return round(normal_raw[interval][device_id] / normal_counts_raw[interval][device_id], 1)
         return 0.0
 
+    now_local = datetime.now(DASHBOARD_TIMEZONE)
+
     for interval in range(96):
         hour = interval // 4
         minute = (interval % 4) * 15
@@ -1221,7 +1223,25 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
             autarkie_pct = None
             autarkie_batt_pct = None
             autarkie_pv_pct = None
+
+        # Für heute: zukünftige IST-Slots nicht mit 0 auffüllen, sondern als null markieren.
+        slot_dt_local = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=DASHBOARD_TIMEZONE) + timedelta(minutes=interval * 15)
+        is_future_slot = target_date == now_local.date() and slot_dt_local > now_local
+
         consumers_total_w = round(dhw_w + climate_w + wallbox_w + normal_total_w, 1)
+
+        if is_future_slot:
+            dhw_w = None
+            climate_w = None
+            wallbox_w = None
+            house_w = None
+            battery_w = None
+            grid_w = None
+            normal_total_w = None
+            consumers_total_w = None
+            autarkie_pct = None
+            autarkie_batt_pct = None
+            autarkie_pv_pct = None
         result.append(
             {
                 "hour": hour,
@@ -1230,7 +1250,7 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
                 "climate_w": climate_w,
                 "wallbox_w": wallbox_w,
                 "normal_consumers_w": normal_consumers_w,
-                "normal_total_w": round(normal_total_w, 1),
+                "normal_total_w": round(normal_total_w, 1) if normal_total_w is not None else None,
                 "consumers_total_w": consumers_total_w,
                 "house_w": house_w,
                 "battery_w": battery_w,
