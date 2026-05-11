@@ -718,12 +718,13 @@
             const houseName = consumptionLabels.house || 'Haus';
             const forecastName = consumptionLabels.forecast || 'Prognose';
             const normalConsumerLabels = consumptionLabels.normal_consumers || {};
+            const actualOrNull = (value) => (value == null ? null : value);
             
             const labels = actualHourly.map(item => item.label);
-            const dhwActualValues = actualHourly.map(item => item.dhw_w || 0);
-            const climateActualValues = actualHourly.map(item => item.climate_w || 0);
-            const wallboxActualValues = actualHourly.map(item => item.wallbox_w || 0);
-            const houseActualValues = actualHourly.map(item => item.house_w || 0);
+            const dhwActualValues = actualHourly.map(item => actualOrNull(item.dhw_w));
+            const climateActualValues = actualHourly.map(item => actualOrNull(item.climate_w));
+            const wallboxActualValues = actualHourly.map(item => actualOrNull(item.wallbox_w));
+            const houseActualValues = actualHourly.map(item => actualOrNull(item.house_w));
 
             const normalConsumerIdSet = new Set(Object.keys(normalConsumerLabels));
             actualHourly.forEach(item => {
@@ -774,7 +775,13 @@
                 const label = normalConsumerLabels[deviceId] || deviceId;
                 return {
                     label,
-                    data: actualHourly.map(item => (item.normal_consumers_w && item.normal_consumers_w[deviceId]) || 0),
+                    data: actualHourly.map(item => {
+                        if (item.house_w == null) {
+                            return null;
+                        }
+                        const value = item.normal_consumers_w && item.normal_consumers_w[deviceId];
+                        return value == null ? 0 : value;
+                    }),
                     borderColor: lineColor,
                     backgroundColor: fillColor,
                     borderWidth: 2,
