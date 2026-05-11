@@ -54,6 +54,17 @@ class WallboxConfig(BaseModel):
     status_state_id: Optional[str] = None
 
 
+class BatteryChargeConfig(BaseModel):
+    enabled: bool = True
+    charge_power_w: float = 1500.0
+    min_soc_pct: float = 20.0
+    target_soc_pct: float = 80.0
+    capacity_kwh: float = 10.0
+    charge_efficiency: float = 0.95
+    command_state_id: Optional[str] = None
+    status_state_id: Optional[str] = None
+
+
 class ControlConfig(BaseModel):
     """Persistierbare Grundkonfiguration fuer die Steuerlogik."""
 
@@ -64,6 +75,7 @@ class ControlConfig(BaseModel):
     dhw: Optional[WaterHeatPumpConfig] = None
     climate: Optional[ClimateConfig] = None
     wallbox: Optional[WallboxConfig] = None
+    battery_charge: Optional[BatteryChargeConfig] = None
 
 
 class ControlPlanRequest(BaseModel):
@@ -75,6 +87,7 @@ class ControlPlanRequest(BaseModel):
     dhw: Optional[WaterHeatPumpConfig] = None
     climate: Optional[ClimateConfig] = None
     wallbox: Optional[WallboxConfig] = None
+    battery_charge: Optional[BatteryChargeConfig] = None
 
 
 @dataclass
@@ -98,6 +111,9 @@ class ControlPlanSlotResult(BaseModel):
     wallbox_power_w: float = 0.0
     wallbox_phase_mode: str = "off"
     wallbox_soc_pct: Optional[float] = None
+    battery_charge_on: bool = False
+    battery_charge_power_w: float = 0.0
+    battery_soc_pct: Optional[float] = None
     notes: List[str] = Field(default_factory=list)
 
 
@@ -200,6 +216,27 @@ def _plan_wallbox(
     return _DeviceAction(on=True, power_w=power_w, reason="charge_with_available_surplus")
 
 
+def _plan_battery_charge(
+    cfg: BatteryChargeConfig,
+    available_w: float,
+    current_soc_pct: float,
+) -> _DeviceAction:
+    if not cfg.enabled:
+        return _DeviceAction(on=False, power_w=0.0, reason="disabled")
+
+    if cfg.capacity_kwh <= 0:
+        return _DeviceAction(on=False, power_w=0.0, reason="invalid_capacity")
+
+    if current_soc_pct >= cfg.target_soc_pct:
+        return _DeviceAction(on=False, power_w=0.0, reason="target_soc_reached")
+
+    if available_w < 100.0:
+        return _DeviceAction(on=False, power_w=0.0, reason="not_enough_surplus")
+
+    power_w = min(cfg.charge_power_w, available_w)
+    return _DeviceAction(on=True, power_w=power_w, reason="charge_with_available_surplus")
+
+
 async def create_control_plan(payload: ControlPlanRequest) -> ControlPlanResponse:
     slots = payload.slots
     interval_h = payload.interval_minutes / 60.0
@@ -208,10 +245,12 @@ async def create_control_plan(payload: ControlPlanRequest) -> ControlPlanRespons
     dhw_cfg = payload.dhw
     climate_cfg = payload.climate
     wallbox_cfg = payload.wallbox
+    battery_cfg = payload.battery_charge
 
     dhw_temp = dhw_cfg.temp_current_c if dhw_cfg else None
     climate_temp = climate_cfg.temp_current_c if climate_cfg else None
     wallbox_soc = wallbox_cfg.vehicle_soc_pct if wallbox_cfg else None
+    battery_soc = battery_cfg.min_soc_pct if battery_cfg else None
     wallbox_phase_mode = "off"
     wallbox_buffer_remaining = 0
 
@@ -282,6 +321,23 @@ async def create_control_plan(payload: ControlPlanRequest) -> ControlPlanRespons
                     notes.append("wallbox_below_min_surplus_dhw_climate_prioritized")
                 wallbox_phase_mode = "off"
 
+        # Akku-Laden: lowest priority, uses remaining surplus
+        battery_action = _DeviceAction(False, 0.0, "not_configured")
+        if battery_cfg and battery_soc is not None:
+            battery_action = _plan_battery_charge(
+                battery_cfg,
+                available_w=available_w,
+                current_soc_pct=battery_soc,
+            )
+
+            if battery_action.on:
+                used_battery_power = min(available_w, battery_action.power_w)
+                available_w = max(0.0, available_w - used_battery_power)
+
+                charged_kwh = used_battery_power * interval_h / 1000.0 * battery_cfg.charge_efficiency
+                soc_delta = (charged_kwh / battery_cfg.capacity_kwh) * 100.0
+                battery_soc = min(100.0, battery_soc + soc_delta)
+
         results.append(
             ControlPlanSlotResult(
                 ts=slot.ts,
@@ -297,6 +353,9 @@ async def create_control_plan(payload: ControlPlanRequest) -> ControlPlanRespons
                 wallbox_power_w=wallbox_action.power_w if wallbox_action.on else 0.0,
                 wallbox_phase_mode=wallbox_phase_mode,
                 wallbox_soc_pct=wallbox_soc,
+                battery_charge_on=battery_action.on,
+                battery_charge_power_w=battery_action.power_w if battery_action.on else 0.0,
+                battery_soc_pct=battery_soc,
                 notes=notes,
             )
         )
@@ -308,9 +367,11 @@ async def create_control_plan(payload: ControlPlanRequest) -> ControlPlanRespons
         "dhw_windows": _extract_windows(results, "dhw_on"),
         "climate_windows": _extract_windows(results, "climate_on"),
         "wallbox_windows": _extract_windows(results, "wallbox_on"),
+        "battery_windows": _extract_windows(results, "battery_charge_on"),
         "final_dhw_temp_c": dhw_temp,
         "final_climate_temp_c": climate_temp,
         "final_wallbox_soc_pct": wallbox_soc,
+        "final_battery_soc_pct": battery_soc,
     }
 
     writeback: Dict[str, Any] = {

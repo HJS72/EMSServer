@@ -906,6 +906,7 @@ def _build_consumption_hourly(forecast_slots: List[Dict[str, Any]]) -> List[Dict
             "dhw_w": 0.0,
             "climate_w": 0.0,
             "wallbox_w": 0.0,
+            "battery_charge_w": 0.0,
             "base_load_w": 0.0,
         }
         for hour in range(24)
@@ -920,6 +921,7 @@ def _build_consumption_hourly(forecast_slots: List[Dict[str, Any]]) -> List[Dict
         hourly[hour]["dhw_w"] += float(slot.dhw_power_w or 0.0)
         hourly[hour]["climate_w"] += float(slot.climate_power_w or 0.0)
         hourly[hour]["wallbox_w"] += float(slot.wallbox_power_w or 0.0)
+        hourly[hour]["battery_charge_w"] += float(slot.battery_charge_power_w or 0.0)
         counts[hour] += 1
 
     # Grundlast aus Forecast-Slots auf Stundenmittel aggregieren.
@@ -937,8 +939,9 @@ def _build_consumption_hourly(forecast_slots: List[Dict[str, Any]]) -> List[Dict
         dhw_w = round(hourly[hour]["dhw_w"] / divisor, 1)
         climate_w = round(hourly[hour]["climate_w"] / divisor, 1)
         wallbox_w = round(hourly[hour]["wallbox_w"] / divisor, 1)
+        battery_charge_w = round(hourly[hour]["battery_charge_w"] / divisor, 1)
         base_load_w = round(hourly[hour]["base_load_w"] / divisor, 1)
-        total_w = round(dhw_w + climate_w + wallbox_w + base_load_w, 1)
+        total_w = round(dhw_w + climate_w + wallbox_w + battery_charge_w + base_load_w, 1)
         result_items.append(
             {
                 "hour": hour,
@@ -946,6 +949,7 @@ def _build_consumption_hourly(forecast_slots: List[Dict[str, Any]]) -> List[Dict
                 "dhw_w": dhw_w,
                 "climate_w": climate_w,
                 "wallbox_w": wallbox_w,
+                "battery_charge_w": battery_charge_w,
                 "base_load_w": base_load_w,
                 "total_w": total_w,
             }
@@ -962,6 +966,7 @@ def _empty_consumption_hourly() -> List[Dict[str, Any]]:
             "dhw_w": 0.0,
             "climate_w": 0.0,
             "wallbox_w": 0.0,
+            "battery_charge_w": 0.0,
             "base_load_w": 0.0,
             "total_w": 0.0,
         }
@@ -975,6 +980,7 @@ def _get_consumption_labels() -> Dict[str, Any]:
         "dhw": "Warmwasser",
         "climate": "Klima",
         "wallbox": "Wallbox",
+        "battery_charge": "Akku laden",
         "base_load": "Grundlast",
         "house": "Haus",
         "forecast": "Prognose",
