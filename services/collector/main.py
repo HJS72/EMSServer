@@ -44,11 +44,10 @@ class Collector:
         except Exception as e:
             logger.warning("Fehler beim Laden von Device-Config: %s", e)
         
-        # Puffer fuer laufende Aggregation: alias -> [float, ...]
+        # Puffer fuer laufende Aggregation: state-id -> [float, ...]
         self._buffer: Dict[str, List[float]] = defaultdict(list)
         self._last_agg: float = time.monotonic()
         self._running = True
-        self._alias_map: Dict[str, DataPoint] = {dp.alias: dp for dp in all_datapoints}
         self._id_map: Dict[str, DataPoint] = {dp.id: dp for dp in all_datapoints}
         self._datapoints = all_datapoints
 
@@ -106,7 +105,8 @@ class Collector:
                 .field("unit", dp.unit)
                 .time(now)
             )
-            self._buffer[dp.alias].append(value)
+            # Buffer by unique state-id to avoid mixing values from duplicate aliases.
+            self._buffer[dp.id].append(value)
 
         if raw_points:
             self.influx.write_points(self.cfg.influxdb.bucket_raw, raw_points)
@@ -120,10 +120,10 @@ class Collector:
 
     def _flush_aggregations(self, ts: datetime) -> None:
         agg_points: List[Point] = []
-        for alias, values in self._buffer.items():
+        for state_id, values in self._buffer.items():
             if not values:
                 continue
-            dp = self._alias_map.get(alias)
+            dp = self._id_map.get(state_id)
             if dp is None:
                 continue
             avg = sum(values) / len(values)

@@ -896,6 +896,8 @@
 
             // Autarkie % (0-100, null wenn keine Daten)
             const autarkieValues = slots.map(s => s.autarkie_pct ?? null);
+            // Hausverbrauch
+            const houseValues = slots.map(s => s.house_w ?? null);
             // Netzbezug: max(0, grid_w)
             const netzbezugValues = slots.map(s => s.grid_w != null ? Math.max(0, s.grid_w) : null);
             // Einspeisung: max(0, -grid_w) als positive Werte
@@ -907,7 +909,7 @@
                     datasets: [
                         {
                             type: 'line',
-                            label: 'Autarkie %',
+                            label: 'PV-Strom %',
                             data: autarkieValues,
                             borderColor: 'rgb(22, 163, 74)',
                             backgroundColor: 'rgba(22, 163, 74, 0.15)',
@@ -921,24 +923,51 @@
                             order: 1,
                         },
                         {
-                            type: 'bar',
+                            type: 'line',
                             label: 'Netzbezug',
                             data: netzbezugValues,
-                            backgroundColor: 'rgba(239, 68, 68, 0.65)',
+                            backgroundColor: 'rgba(239, 68, 68, 0)',
                             borderColor: 'rgb(239, 68, 68)',
-                            borderWidth: 0,
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            fill: false,
+                            tension: 0.25,
+                            spanGaps: true,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
                             yAxisID: 'yW',
                             order: 3,
                         },
                         {
-                            type: 'bar',
-                            label: 'Einspeisung',
-                            data: einspeisungValues,
-                            backgroundColor: 'rgba(251, 191, 36, 0.65)',
-                            borderColor: 'rgb(251, 191, 36)',
-                            borderWidth: 0,
+                            type: 'line',
+                            label: 'Hausverbrauch',
+                            data: houseValues,
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.25,
+                            spanGaps: true,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
                             yAxisID: 'yW',
                             order: 2,
+                        },
+                        {
+                            type: 'line',
+                            label: 'Einspeisung',
+                            data: einspeisungValues,
+                            backgroundColor: 'rgba(251, 191, 36, 0)',
+                            borderColor: 'rgb(251, 191, 36)',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            fill: false,
+                            tension: 0.25,
+                            spanGaps: true,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            yAxisID: 'yW',
+                            order: 1,
                         },
                     ]
                 },
@@ -991,7 +1020,7 @@
                                 callback: v => v + ' %'
                             },
                             grid: { color: 'rgba(0,0,0,0.05)' },
-                            title: { display: true, text: 'Autarkie', color: 'rgb(22, 163, 74)', font: { size: 12 } }
+                            title: { display: true, text: 'PV-Strom %', color: 'rgb(22, 163, 74)', font: { size: 12 } }
                         },
                         yW: {
                             type: 'linear',

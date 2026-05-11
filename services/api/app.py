@@ -1187,8 +1187,9 @@ from(bucket: "{cfg.influxdb.bucket_raw}")
                 normal_consumers_w[device_id] = value
                 normal_total_w += value
 
-        grid_w = round(quarterly[interval]["grid_w"] / counts_agg[interval]["grid_w"], 1) if counts_agg[interval]["grid_w"] > 0 else (
-            round(quarterly_raw[interval]["grid_w"] / counts_raw[interval]["grid_w"], 1) if counts_raw[interval]["grid_w"] > 0 else None
+        # grid_power: prefer raw data because historical 15m aggregates can be biased.
+        grid_w = round(quarterly_raw[interval]["grid_w"] / counts_raw[interval]["grid_w"], 1) if counts_raw[interval]["grid_w"] > 0 else (
+            round(quarterly[interval]["grid_w"] / counts_agg[interval]["grid_w"], 1) if counts_agg[interval]["grid_w"] > 0 else None
         )
         # Autarkie: Eigenverbrauch / Gesamtverbrauch
         # grid_w > 0: Netzbezug, grid_w < 0: Einspeisung
