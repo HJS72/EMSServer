@@ -14,6 +14,7 @@ class ForecastSlot(BaseModel):
 
     ts: str
     surplus_w: float = Field(default=0.0)
+    temp_c: Optional[float] = None
 
 
 class WaterHeatPumpConfig(BaseModel):
@@ -36,6 +37,7 @@ class ClimateConfig(BaseModel):
     temp_max_c: float = 26.0
     cool_gain_c_per_slot: float = 0.8
     heat_gain_c_per_slot: float = 0.2
+    ambient_transfer_per_slot: float = 0.01
     command_state_id: Optional[str] = None
     status_state_id: Optional[str] = None
 
@@ -190,6 +192,19 @@ def _plan_climate(cfg: ClimateConfig, available_w: float, current_temp_c: float)
     return _DeviceAction(on=False, power_w=0.0, reason="within_window")
 
 
+def _climate_passive_temp_delta(cfg: ClimateConfig, indoor_temp_c: float, outdoor_temp_c: Optional[float]) -> float:
+    """Berechnet die passive Temperaturdrift pro Slot.
+
+    Mit Außentemperatur: Annäherung an außen via Faktor (default 0.01 pro 15min).
+    Ohne Außentemperatur: Fallback auf statische heat_gain_c_per_slot.
+    """
+    if outdoor_temp_c is None:
+        return cfg.heat_gain_c_per_slot
+
+    transfer = max(0.0, min(1.0, cfg.ambient_transfer_per_slot))
+    return (outdoor_temp_c - indoor_temp_c) * transfer
+
+
 def _plan_wallbox(
     cfg: WallboxConfig,
     available_w: float,
@@ -288,7 +303,11 @@ async def create_control_plan(payload: ControlPlanRequest) -> ControlPlanRespons
                 available_w = max(0.0, available_w - used_climate_power)
                 climate_temp = max(climate_cfg.temp_min_c, climate_temp - climate_cfg.cool_gain_c_per_slot)
             else:
-                climate_temp = climate_temp + climate_cfg.heat_gain_c_per_slot
+                climate_temp = climate_temp + _climate_passive_temp_delta(
+                    climate_cfg,
+                    indoor_temp_c=climate_temp,
+                    outdoor_temp_c=slot.temp_c,
+                )
 
         # Wallbox ist passiv: lädt mit verbleibendem Überschuss, mind. min_power_w
         wallbox_action = _DeviceAction(False, 0.0, "not_configured")

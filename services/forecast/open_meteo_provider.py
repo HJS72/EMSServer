@@ -344,6 +344,7 @@ def build_surplus_slots(
             "pv_w": round(calibrated_pv_w, 1),
             "pv_w_raw": round(raw_pv_w, 1),
             "base_load_w": cfg.base_load_w,
+            "temp_c": round(float(aggregated[ts].get("temp_c", 0.0)), 1),
         }
         slots.append(slot)
         new_history_items.append(

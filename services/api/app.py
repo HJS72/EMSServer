@@ -764,6 +764,7 @@ def _generate_24h_slots(slots: List[Dict[str, Any]], target_date, history_map: O
                     "pv_w": slot.get("pv_w", 0),
                     "surplus_w": slot.get("surplus_w", 0),
                     "base_load_w": slot.get("base_load_w", 0),
+                    "temp_c": slot.get("temp_c"),
                 })
             else:
                 # Fallback: historische Vorhersage aus History-Datei, sonst 0W
@@ -773,6 +774,7 @@ def _generate_24h_slots(slots: List[Dict[str, Any]], target_date, history_map: O
                     "pv_w": round(history_pv_w, 1),
                     "surplus_w": 0,
                     "base_load_w": 0,
+                    "temp_c": None,
                 })
     
     return result
