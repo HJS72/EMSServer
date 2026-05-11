@@ -975,6 +975,7 @@ def _get_consumption_labels() -> Dict[str, Any]:
         "dhw": "Warmwasser",
         "climate": "Klima",
         "wallbox": "Wallbox",
+        "base_load": "Grundlast",
         "house": "Haus",
         "forecast": "Prognose",
         "normal_consumers": {},

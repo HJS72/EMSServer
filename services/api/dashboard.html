@@ -649,6 +649,7 @@
             const dhwName = consumptionLabels.dhw || 'Warmwasser';
             const climateName = consumptionLabels.climate || 'Klima';
             const wallboxName = consumptionLabels.wallbox || 'Wallbox';
+            const baseLoadName = consumptionLabels.base_load || 'Grundlast';
             const houseName = consumptionLabels.house || 'Haus';
             const forecastName = consumptionLabels.forecast || 'Prognose';
             const normalConsumerLabels = consumptionLabels.normal_consumers || {};
@@ -675,11 +676,16 @@
                 `${String(normalizeHour(item.hour)).padStart(2, '0')}:00`,
                 item
             ]));
-            const forecastTotalValues = labels.map(lbl => {
+            const forecastSeriesByHour = (field) => labels.map(lbl => {
                 const hourKey = `${String(parseInt(lbl.split(':')[0], 10)).padStart(2, '0')}:00`;
                 const match = forecastByTime.get(hourKey);
-                return match ? (match.total_w || 0) : 0;
+                return match ? (match[field] || 0) : 0;
             });
+            const forecastDhwValues = forecastSeriesByHour('dhw_w');
+            const forecastClimateValues = forecastSeriesByHour('climate_w');
+            const forecastWallboxValues = forecastSeriesByHour('wallbox_w');
+            const forecastBaseLoadValues = forecastSeriesByHour('base_load_w');
+            const forecastTotalValues = forecastSeriesByHour('total_w');
 
             const normalConsumerPalette = [
                 ['rgb(217, 119, 6)', 'rgb(217, 119, 6)'],
@@ -793,6 +799,58 @@
                         },
                         ...normalConsumerDatasets,
                         {
+                            label: `${dhwName} (${forecastName})`,
+                            data: forecastDhwValues,
+                            borderColor: 'rgba(5, 150, 105, 0.95)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.18)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            stack: 'forecast_components',
+                            order: 2,
+                        },
+                        {
+                            label: `${climateName} (${forecastName})`,
+                            data: forecastClimateValues,
+                            borderColor: 'rgba(2, 132, 199, 0.95)',
+                            backgroundColor: 'rgba(14, 165, 233, 0.18)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            stack: 'forecast_components',
+                            order: 2,
+                        },
+                        {
+                            label: `${wallboxName} (${forecastName})`,
+                            data: forecastWallboxValues,
+                            borderColor: 'rgba(217, 119, 6, 0.95)',
+                            backgroundColor: 'rgba(245, 158, 11, 0.18)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            stack: 'forecast_components',
+                            order: 2,
+                        },
+                        {
+                            label: `${baseLoadName} (${forecastName})`,
+                            data: forecastBaseLoadValues,
+                            borderColor: 'rgba(71, 85, 105, 0.95)',
+                            backgroundColor: 'rgba(100, 116, 139, 0.2)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            stack: 'forecast_components',
+                            order: 2,
+                        },
+                        {
                             label: forecastName,
                             data: forecastTotalValues,
                             borderColor: 'rgb(30, 64, 175)',
@@ -841,10 +899,13 @@
                                     const istHouse = items
                                         .filter(item => item.dataset.stack === 'ist')
                                         .reduce((sum, item) => sum + (item.parsed?.y || 0), 0);
+                                    const prognoseComponents = items
+                                        .filter(item => item.dataset.stack === 'forecast_components')
+                                        .reduce((sum, item) => sum + (item.parsed?.y || 0), 0);
                                     const prognose = items
                                         .filter(item => item.dataset.label === forecastName)
                                         .reduce((sum, item) => sum + (item.parsed?.y || 0), 0);
-                                    return `Gestackte Verbraucher: ${istConsumer.toLocaleString('de-DE')} W | ${houseName}: ${istHouse.toLocaleString('de-DE')} W | ${forecastName}: ${prognose.toLocaleString('de-DE')} W`;
+                                    return `Gestackte Verbraucher: ${istConsumer.toLocaleString('de-DE')} W | ${houseName}: ${istHouse.toLocaleString('de-DE')} W | ${forecastName} Geräte-Stack: ${prognoseComponents.toLocaleString('de-DE')} W | ${forecastName} gesamt: ${prognose.toLocaleString('de-DE')} W`;
                                 }
                             }
                         }
