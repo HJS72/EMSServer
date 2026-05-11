@@ -897,6 +897,7 @@
             // Autarkie-Anteile in % (0-100)
             const autarkiePvValues = slots.map(s => s.autarkie_pv_pct ?? null);
             const autarkieBattValues = slots.map(s => s.autarkie_batt_pct ?? null);
+            const autarkieTotalValues = slots.map(s => s.autarkie_pct ?? null);
             // Hausverbrauch
             const houseValues = slots.map(s => s.house_w ?? null);
             // Netzbezug: max(0, grid_w)
@@ -909,26 +910,51 @@
                     labels,
                     datasets: [
                         {
-                            type: 'bar',
+                            type: 'line',
                             label: 'Autarkie aus PV %',
                             data: autarkiePvValues,
-                            backgroundColor: 'rgba(22, 163, 74, 0.75)',
+                            backgroundColor: 'rgba(22, 163, 74, 0.18)',
                             borderColor: 'rgb(22, 163, 74)',
-                            borderWidth: 0,
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.25,
+                            spanGaps: true,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
                             stack: 'autarkie-pct',
                             yAxisID: 'yPct',
                             order: 6,
                         },
                         {
-                            type: 'bar',
+                            type: 'line',
                             label: 'Autarkie aus Batterie %',
                             data: autarkieBattValues,
-                            backgroundColor: 'rgba(5, 150, 105, 0.75)',
+                            backgroundColor: 'rgba(5, 150, 105, 0.20)',
                             borderColor: 'rgb(5, 150, 105)',
-                            borderWidth: 0,
+                            borderWidth: 2,
+                            fill: '-1',
+                            tension: 0.25,
+                            spanGaps: true,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
                             stack: 'autarkie-pct',
                             yAxisID: 'yPct',
-                            order: 6,
+                            order: 7,
+                        },
+                        {
+                            type: 'line',
+                            label: 'Autarkie gesamt %',
+                            data: autarkieTotalValues,
+                            borderColor: 'rgb(21, 128, 61)',
+                            backgroundColor: 'rgba(21, 128, 61, 0)',
+                            borderWidth: 2.5,
+                            fill: false,
+                            tension: 0.25,
+                            spanGaps: true,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            yAxisID: 'yPct',
+                            order: 8,
                         },
                         {
                             type: 'line',
