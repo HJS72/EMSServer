@@ -174,6 +174,21 @@ async def merge_live_states(config: Dict[str, Any]) -> Dict[str, Any]:
                     logger.info(f"DHW live temp: {val}°C (state: {temp_id})")
                 else:
                     logger.warning(f"DHW temp_water State nicht verfügbar: {temp_id}")
+            # Grenzwerte aus ioBroker holen
+            temp_min_id = _measurement_iobroker_id(device, "temp_min")
+            if temp_min_id:
+                state = states.get(temp_min_id)
+                val = _coerce_float(state.get("val") if isinstance(state, dict) else None)
+                if val is not None:
+                    section_cfg["temp_min_c"] = val
+                    logger.info(f"DHW live temp_min: {val}°C (state: {temp_min_id})")
+            temp_max_id = _measurement_iobroker_id(device, "temp_max")
+            if temp_max_id:
+                state = states.get(temp_max_id)
+                val = _coerce_float(state.get("val") if isinstance(state, dict) else None)
+                if val is not None:
+                    section_cfg["temp_max_c"] = val
+                    logger.info(f"DHW live temp_max: {val}°C (state: {temp_max_id})")
 
         elif section == "climate":
             if not section_cfg.get("command_state_id"):
@@ -194,6 +209,21 @@ async def merge_live_states(config: Dict[str, Any]) -> Dict[str, Any]:
                     logger.info(f"Climate live temp: {val}°C (state: {temp_id})")
                 else:
                     logger.warning(f"Climate temp_room State nicht verfügbar: {temp_id}")
+            # Grenzwerte aus ioBroker holen
+            temp_min_id = _measurement_iobroker_id(device, "temp_min")
+            if temp_min_id:
+                state = states.get(temp_min_id)
+                val = _coerce_float(state.get("val") if isinstance(state, dict) else None)
+                if val is not None:
+                    section_cfg["temp_min_c"] = val
+                    logger.info(f"Climate live temp_min: {val}°C (state: {temp_min_id})")
+            temp_max_id = _measurement_iobroker_id(device, "temp_max")
+            if temp_max_id:
+                state = states.get(temp_max_id)
+                val = _coerce_float(state.get("val") if isinstance(state, dict) else None)
+                if val is not None:
+                    section_cfg["temp_max_c"] = val
+                    logger.info(f"Climate live temp_max: {val}°C (state: {temp_max_id})")
 
         elif section == "wallbox":
             if not section_cfg.get("command_state_id"):
