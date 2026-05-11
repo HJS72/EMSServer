@@ -164,12 +164,16 @@ async def merge_live_states(config: Dict[str, Any]) -> Dict[str, Any]:
                 sid = _measurement_iobroker_id(device, "windows")
                 if sid:
                     section_cfg["status_state_id"] = sid
-            if "temp_current_c" not in section_cfg:
-                temp_id = _measurement_iobroker_id(device, "temp_water")
-                state = states.get(temp_id) if temp_id else None
+            # Immer Live-Temperatur aus ioBroker holen wenn State gemappt
+            temp_id = _measurement_iobroker_id(device, "temp_water")
+            if temp_id:
+                state = states.get(temp_id)
                 val = _coerce_float(state.get("val") if isinstance(state, dict) else None)
                 if val is not None:
                     section_cfg["temp_current_c"] = val
+                    logger.info(f"DHW live temp: {val}°C (state: {temp_id})")
+                else:
+                    logger.warning(f"DHW temp_water State nicht verfügbar: {temp_id}")
 
         elif section == "climate":
             if not section_cfg.get("command_state_id"):
@@ -180,12 +184,16 @@ async def merge_live_states(config: Dict[str, Any]) -> Dict[str, Any]:
                 sid = _measurement_iobroker_id(device, "windows")
                 if sid:
                     section_cfg["status_state_id"] = sid
-            if "temp_current_c" not in section_cfg:
-                temp_id = _measurement_iobroker_id(device, "temp_room")
-                state = states.get(temp_id) if temp_id else None
+            # Immer Live-Temperatur aus ioBroker holen wenn State gemappt
+            temp_id = _measurement_iobroker_id(device, "temp_room")
+            if temp_id:
+                state = states.get(temp_id)
                 val = _coerce_float(state.get("val") if isinstance(state, dict) else None)
                 if val is not None:
                     section_cfg["temp_current_c"] = val
+                    logger.info(f"Climate live temp: {val}°C (state: {temp_id})")
+                else:
+                    logger.warning(f"Climate temp_room State nicht verfügbar: {temp_id}")
 
         elif section == "wallbox":
             if not section_cfg.get("command_state_id"):
@@ -196,12 +204,16 @@ async def merge_live_states(config: Dict[str, Any]) -> Dict[str, Any]:
                 sid = _measurement_iobroker_id(device, "plan")
                 if sid:
                     section_cfg["status_state_id"] = sid
-            if "vehicle_soc_pct" not in section_cfg:
-                soc_id = _measurement_iobroker_id(device, "vehicle_soc")
-                state = states.get(soc_id) if soc_id else None
+            # Immer Live-SOC aus ioBroker holen wenn State gemappt
+            soc_id = _measurement_iobroker_id(device, "vehicle_soc")
+            if soc_id:
+                state = states.get(soc_id)
                 val = _coerce_float(state.get("val") if isinstance(state, dict) else None)
                 if val is not None:
                     section_cfg["vehicle_soc_pct"] = val
+                    logger.info(f"Wallbox live SOC: {val}% (state: {soc_id})")
+                else:
+                    logger.warning(f"Wallbox vehicle_soc State nicht verfügbar: {soc_id}")
 
     return config
 
