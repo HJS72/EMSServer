@@ -443,16 +443,27 @@
             }
 
             const actualHourly = data.consumption_actual_hourly || [];
-            const validHours = actualHourly.filter(h => h.house_w > 0);
+            const validHours = actualHourly.filter(h => h.house_w != null && h.house_w > 0);
             const latestHour = validHours.length > 0 ? validHours[validHours.length - 1] : null;
             const autarkiePct = latestHour ? latestHour.autarkie_pct : null;
             const autarkieLabel = latestHour ? `${latestHour.label} Uhr` : '–';
+
+            // Tagesenergie aus stündlichen Intervallen (jedes = 1h, Wh = W * 1h)
+            const verbrauchWhTag = validHours.reduce((s, h) => s + (h.house_w || 0), 0);
+            const bezugWhTag = validHours.reduce((s, h) => s + Math.max(0, h.grid_w || 0), 0);
+            const fmtKwh = (wh) => wh >= 1000
+                ? (wh / 1000).toLocaleString('de-DE', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' kWh'
+                : Math.round(wh).toLocaleString('de-DE') + ' Wh';
             
             const metricsHTML = `
                 <div class="metric-card autarkie">
                     <h3>Autarkie</h3>
                     <div class="value">${autarkiePct !== null ? autarkiePct.toLocaleString('de-DE', {maximumFractionDigits: 1}) : '–'} <span class="unit">%</span></div>
                     <div style="font-size: 12px; color: #666; margin-top: 8px;">Stand: ${autarkieLabel}</div>
+                    ${validHours.length > 0 ? `<div style="font-size: 11px; color: #888; margin-top: 6px; line-height: 1.6;">
+                        Verbrauch: ${fmtKwh(verbrauchWhTag)}<br>
+                        Netzbezug: ${fmtKwh(bezugWhTag)}
+                    </div>` : ''}
                 </div>
                 <div class="metric-card pv">
                     <h3>Aktuelle PV-Leistung</h3>
